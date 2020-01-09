@@ -10,7 +10,8 @@ mod font;
 use font::{Font, Char};
 use std::collections::HashMap;
 use quicksilver::graphics::Color;
-
+extern crate console_error_panic_hook;
+use std::panic;
 
 struct Game;
 
@@ -47,11 +48,18 @@ impl Tileset {
 
 async fn core(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
     let font_name = "Px437_PhoenixEGA_8x8.ttf";
-    let tileset = Tileset::from_font(&gfx, font_name).await.unwrap();
-
-    gfx.clear(Color::RED);
-    tileset.draw(&mut gfx, Char::Smile.as_char(), Rectangle::new((10,10), (10, 10)));
+    // let tileset = Tileset::from_font(&gfx, font_name).await.unwrap();
+    gfx.clear(Color::WHITE);
+    // Paint a blue square with a red outline in the center of our screen
+    // It should have a top-left of (350, 100) and a size of (150, 100)
+    let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
+    gfx.fill_rect(&rect, Color::BLUE);
+    gfx.stroke_rect(&rect, Color::RED);
+    // Send the data to be drawn
     gfx.present(&window)?;
+
+    // tileset.draw(&mut gfx, Char::Smile.as_char(), Rectangle::new((10,10), (10, 10)));
+
     loop {
         while let Some(_) = events.next_event().await {}
     }
@@ -59,7 +67,7 @@ async fn core(window: Window, mut gfx: Graphics, mut events: EventStream) -> Res
 
 
 fn main() {
-    std::env::set_var("WINIT_HIDPI_FACTOR", "1.0");
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
     run(Settings {
         size: Vector::new(800.0, 600.0).into(),
         title: "Four AM",

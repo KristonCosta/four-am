@@ -46,7 +46,6 @@ impl Font {
         let scale = Scale::uniform(size);
         let offset = point(0.0, self.data.v_metrics(scale).ascent);
         let glyphs: Vec<_> = self.data.layout(text, scale, offset).collect();
-        println!("{}", text);
         let base_width = glyphs.iter().rev()
             .map(|g|
                 g.position().x as f32 + g.unpositioned().h_metrics().advance_width)

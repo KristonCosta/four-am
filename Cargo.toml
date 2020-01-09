@@ -9,9 +9,10 @@ edition = "2018"
 [dependencies]
 rusttype = "0.8.2"
 image = "0.23.0-preview.0"
+console_error_panic_hook = "0.1.6"
 
 [dependencies.quicksilver]
 git = "https://github.com/ryanisaacg/quicksilver"
 branch = "master"
-default-features = false
-features = ["saving", "web-sys"]
+
+features = ["saving", "stdweb"]
