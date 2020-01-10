@@ -5,6 +5,7 @@ use rusttype::{Font as RTFont, Scale, point};
 use quicksilver::geom::Rectangle;
 use quicksilver::graphics::{Image, PixelFormat};
 use crate::glyph::Glyph;
+use pathfinding::directed::dijkstra::dijkstra;
 
 fn main() {
     run(
@@ -224,34 +225,71 @@ pub fn get_char_from_edges(edges: i32) -> char {
     }
 }
 
-pub fn maze_renderer(maze: &str) -> Vec<(Glyph, Vector)> {
-    let mut res = vec![];
-    let height = maze.lines().count();
-    let width = maze.lines().next().unwrap().len();
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Pos(usize, usize);
+
+pub fn visitable_tiles(p: &Pos, maze: &Vec<Vec<char>>) -> Vec<(Pos, usize)> {
+    let width = maze[0].len();
+    let height = maze.len();
+    let mut succ = vec![];
+    if p.1 < height - 1 && maze[p.1 + 1][p.0] == ' ' {
+        succ.push((Pos(p.0, p.1 + 1), 1))
+    }
+    if p.1 > 0 && maze[p.1 - 1][p.0] == ' ' {
+        succ.push((Pos(p.0, p.1 - 1), 1))
+    }
+    if p.0 < width - 1 && maze[p.1][p.0 + 1] == ' ' {
+        succ.push((Pos(p.0 + 1, p.1), 1))
+    }
+    if p.0 > 0 && maze[p.1][p.0 - 1] == ' ' {
+        succ.push((Pos(p.0 - 1, p.1), 1))
+    }
+    println!("{:?}", succ);
+    succ
+}
+
+pub fn maze_to_vec(maze: &str) -> (Pos, Pos, Vec<Vec<char>>) {
+    let mut start = Pos(0, 0);
+    let mut end = Pos(0, 0);
     let mut conv: Vec<Vec<char>> = vec![];
-    for line in maze.lines() {
+    for (y, line) in maze.lines().enumerate() {
         let mut v: Vec<char> = vec![];
-        for c in line.chars() {
-          v.push(c);
+        for (x, c) in line.chars().enumerate() {
+            if c == '☻' {
+                start = Pos(x, y);
+            }
+            if c == '♥' {
+                end = Pos(x, y);
+            }
+            v.push(c);
         }
         conv.push(v);
     }
+    (start, end, conv)
+}
+
+pub fn maze_renderer(conv: &Vec<Vec<char>>) -> Vec<(Glyph, Vector)> {
+    let mut res = vec![];
+    let height = conv.len();
+    let width = conv[0].len();
+
     for x in 0..width {
         for y in 0..height {
             let mut edges = 0b0;
-            if conv[y][x] == ' ' {
+            if conv[y][x] != '#' {
+
                 continue;
             }
-            if x > 0 && conv[y][x - 1] != ' ' {
+            if x > 0 && conv[y][x - 1] == '#' {
                 edges = edges | 0b0100;
             }
-            if x < width - 1 && conv[y][x + 1] != ' ' {
+            if x < width - 1 && conv[y][x + 1] == '#' {
                 edges = edges | 0b1000;
             }
-            if y > 0 && conv[y - 1][x] != ' ' {
+            if y > 0 && conv[y - 1][x] == '#' {
                 edges = edges | 0b0001;
             }
-            if y < height - 1 && conv[y + 1][x] != ' ' {
+            if y < height - 1 && conv[y + 1][x] == '#' {
                 edges = edges | 0b0010;
             }
             let ch = get_char_from_edges(edges);
@@ -268,7 +306,7 @@ pub fn maze_renderer(maze: &str) -> Vec<(Glyph, Vector)> {
 
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
     let maze = "\
-#####################################################################   #
+##################################################################### ♥ #
 #   #               #               #           #                   #   #
 #   #   #########   #   #####   #########   #####   #####   #####   #   #
 #               #       #   #           #           #   #   #       #   #
@@ -290,9 +328,12 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
 #   #       #   #   #           #           #   #       #               #
 #   #   #####   #####   #####   #########   #####   #   #########   #   #
 #   #                   #           #               #               #   #
-#   #####################################################################\
+# ☻ #####################################################################\
 ";
-    let maze = maze_renderer(maze);
+    let (start, end, maze_vec) = maze_to_vec(maze);
+
+    let maze = maze_renderer(&maze_vec);
+
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_PhoenixEGA_8x8.ttf").await?;
     gfx.clear(Color::WHITE);
     // let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
@@ -300,6 +341,18 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let grid = grid::Grid::from_tile_size((10.0, 10.0));
     for (glyph, pos) in maze {
         tileset.draw(&mut gfx, &glyph, grid.rect(pos.x as u32 + 2, pos.y as u32 + 2));
+    }
+    let result = dijkstra(&start, |p| visitable_tiles(p, &maze_vec), |p| *p == Pos(71, 1));
+    let mut path: Vec<(Glyph, Pos)> = vec![];
+    if let Some((p, _)) = result {
+        for pos in p {
+            let glyph = Glyph {
+                    ch: '▒',
+                    foreground: Some(Color::GREEN),
+                    background: None
+                };
+            tileset.draw(&mut gfx, &glyph, grid.rect(pos.0 as u32 + 2, pos.1 as u32 + 2));
+        }
     }
 
     gfx.present(&window)?;
