@@ -4,6 +4,7 @@ use quicksilver::{geom::Vector, graphics::{Color, Element, Graphics, Mesh, Verte
 use rusttype::{Font as RTFont, Scale, point};
 use quicksilver::geom::Rectangle;
 use quicksilver::graphics::{Image, PixelFormat};
+use crate::glyph::Glyph;
 
 fn main() {
     run(
@@ -110,7 +111,7 @@ pub mod tileset {
             let lines = r#"╦╩═╬╧╨╤╥╙╘╒╓╫╪┘╠┌█▄▌▐▀αßΓπΣσµτΦδ∞φ╟╚╔║╗╝╣╢╖
 *+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQ⌠⌡≥
 RSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxy÷≈
-z{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°∙
+z{|} ~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°∙
 óúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╕╜╛┐└┴┬├─┼╞·√±≤ⁿε∩≡ΘΩ
 "☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼!#$%&'()²■"#;
             let font = Font::load(path).await.expect("failed to load font");
@@ -156,7 +157,7 @@ z{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°�
 
 pub mod glyph {
     use quicksilver::graphics::Color;
-
+    #[derive(Debug)]
     pub struct Glyph {
         pub ch: char,
         pub foreground: Option<Color>,
@@ -201,34 +202,106 @@ pub mod grid {
     }
 }
 
+pub fn get_char_from_edges(edges: i32) -> char {
+    match edges {
+        0b1101 => '╩',
+        0b1001 => '╚',
+        0b1010 => '╔',
+        0b1100 => '═',
+        0b1000 => '═',
+        0b0100 => '═',
+        0b0011 => '║',
+        0b0010 => '║',
+        0b0001 => '║',
+        0b0110 => '╗',
+        0b0101 => '╝',
+        0b0111 => '╣',
+        0b1111 => '╬',
+        0b1110 => '╦',
+        0b1011 => '╠',
+        0b0000 => ' ',
+        _ => 'A'
+    }
+}
+
+pub fn maze_renderer(maze: &str) -> Vec<(Glyph, Vector)> {
+    let mut res = vec![];
+    let height = maze.lines().count();
+    let width = maze.lines().next().unwrap().len();
+    let mut conv: Vec<Vec<char>> = vec![];
+    for line in maze.lines() {
+        let mut v: Vec<char> = vec![];
+        for c in line.chars() {
+          v.push(c);
+        }
+        conv.push(v);
+    }
+    for x in 0..width {
+        for y in 0..height {
+            let mut edges = 0b0;
+            if conv[y][x] == ' ' {
+                continue;
+            }
+            if x > 0 && conv[y][x - 1] != ' ' {
+                edges = edges | 0b0100;
+            }
+            if x < width - 1 && conv[y][x + 1] != ' ' {
+                edges = edges | 0b1000;
+            }
+            if y > 0 && conv[y - 1][x] != ' ' {
+                edges = edges | 0b0001;
+            }
+            if y < height - 1 && conv[y + 1][x] != ' ' {
+                edges = edges | 0b0010;
+            }
+            let ch = get_char_from_edges(edges);
+            let glyph = Glyph {
+                ch,
+                foreground: Some(Color::BLACK),
+                background: None
+            };
+            res.push((glyph, (x as u32, y as u32).into()));
+        }
+    }
+    res
+}
 
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
-    // Clear the screen to a blank, black color
-    // let mut font = font::Font::load("square.ttf").await?;
-    // let img = font.render(&gfx, "12", 100.0).unwrap();
+    let maze = "\
+#####################################################################   #
+#   #               #               #           #                   #   #
+#   #   #########   #   #####   #########   #####   #####   #####   #   #
+#               #       #   #           #           #   #   #       #   #
+#########   #   #########   #########   #####   #   #   #   #########   #
+#       #   #               #           #   #   #   #   #           #   #
+#   #   #############   #   #   #########   #####   #   #########   #   #
+#   #               #   #   #       #           #           #       #   #
+#   #############   #####   #####   #   #####   #########   #   #####   #
+#           #       #   #       #   #       #           #   #           #
+#   #####   #####   #   #####   #   #########   #   #   #   #############
+#       #       #   #   #       #       #       #   #   #       #       #
+#############   #   #   #   #########   #   #####   #   #####   #####   #
+#           #   #           #       #   #       #   #       #           #
+#   #####   #   #########   #####   #   #####   #####   #############   #
+#   #       #           #           #       #   #   #               #   #
+#   #   #########   #   #####   #########   #   #   #############   #   #
+#   #           #   #   #   #   #           #               #   #       #
+#   #########   #   #   #   #####   #########   #########   #   #########
+#   #       #   #   #           #           #   #       #               #
+#   #   #####   #####   #####   #########   #####   #   #########   #   #
+#   #                   #           #               #               #   #
+#   #####################################################################\
+";
+    let maze = maze_renderer(maze);
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_PhoenixEGA_8x8.ttf").await?;
-    gfx.clear(Color::BLUE);
-    // Paint a triangle with red, green, and blue vertices, blending the colors for the pixels in-between
-    // Define the 3 vertices and move them inside a Vec
-    let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
-    gfx.fill_rect(&rect, Color::RED);
-    let glyph = glyph::Glyph {
-        ch: 'a',
-        foreground: Some(Color::GREEN),
-        background: None,
-    };
+    gfx.clear(Color::WHITE);
+    // let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
+    // gfx.fill_rect(&rect, Color::RED);
     let grid = grid::Grid::from_tile_size((10.0, 10.0));
-    tileset.draw_char(&mut gfx, '╔', grid.rect(0, 0));
-    tileset.draw_char(&mut gfx, '╦', grid.rect(1, 0));
-    tileset.draw_char(&mut gfx, '╗', grid.rect(2, 0));
-    tileset.draw_char(&mut gfx, '╠', grid.rect(0, 1));
-    tileset.draw_char(&mut gfx, '╬', grid.rect(1, 1));
-    tileset.draw_char(&mut gfx, '╣', grid.rect(2, 1));
-    tileset.draw_char(&mut gfx, '╚', grid.rect(0, 2));
-    tileset.draw_char(&mut gfx, '☻', grid.rect(1, 2));
-    tileset.draw_char(&mut gfx, '☺', grid.rect(2, 2));
+    for (glyph, pos) in maze {
+        tileset.draw(&mut gfx, &glyph, grid.rect(pos.x as u32 + 2, pos.y as u32 + 2));
+    }
 
-    // Send the data to be drawn
     gfx.present(&window)?;
     loop {
         while let Some(_) = events.next_event().await {}
