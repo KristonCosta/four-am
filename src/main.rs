@@ -19,7 +19,7 @@ fn main() {
 
 pub mod font {
     use std::path::Path;
-    use rusttype::{Font as RTFont, Scale, point};
+    use rusttype::{Font as RTFont, Scale, point, PositionedGlyph};
     use quicksilver::{Result, load_file};
     use quicksilver::graphics::{Graphics, Image, PixelFormat};
 
@@ -39,30 +39,47 @@ pub mod font {
         }
 
         pub fn render(&self, gfx: &Graphics, text: &str, size: f32) -> Result<Image> {
+            // Most of this is either from, or inspired by, quicksilver
             let scale = Scale::uniform(size);
             let offset = point(0.0, self.data.v_metrics(scale).ascent);
-            let glyphs: Vec<_> = self.data.layout(text, scale, offset).collect();
-            println!("{}", text);
-            let base_width = glyphs.iter().rev()
-                .map(|g|
-                    g.position().x as f32 + g.unpositioned().h_metrics().advance_width)
-                .next().unwrap_or(0.0).ceil() as usize;
-            let width = round_pow_2(base_width as i32) as usize;
-            let height = round_pow_2(size.ceil() as i32) as usize;
-            let mut imgbuf = image::ImageBuffer::new(width as u32, height as u32);
-            for glyph in glyphs {
-                if let Some(bounding_box) = glyph.pixel_bounding_box() {
-                    glyph.draw(|_x, _y, v| {
-                        let x = _x + bounding_box.min.x as u32;
-                        let y = _y + bounding_box.min.y as u32;
-                        let pixel = imgbuf.get_pixel_mut(x, y);
-                        *pixel = image::Rgba([255, 255, 255, (255.0 * v) as u8]);
-                    });
+            let line_count = text.lines().count();
+            let glyphs_per_line = text
+                .lines()
+                .map(|text| {
+                    //Avoid clipping
+                    let offset = point(0.0, self.data.v_metrics(scale).ascent);
+                    let glyphs = self.data.layout(text.trim(), scale, offset)
+                        .collect::<Vec<PositionedGlyph>>();
+                    let width = glyphs.iter().rev()
+                        .map(|g|
+                            g.position().x as f32 + g.unpositioned().h_metrics().advance_width)
+                        .next().unwrap_or(0.0).ceil() as usize;
+                    (glyphs, width)
+                })
+                .collect::<Vec<_>>();
+            let base_width = *glyphs_per_line.iter().map(|(_, width)| width).max().unwrap_or(&0);
+            let max_width = round_pow_2(base_width as i32) as usize;
+            let height = round_pow_2((size * (line_count as f32)).ceil() as i32) as usize;
+            let mut imgbuf = image::ImageBuffer::new(max_width as u32, height as u32);
+            for (line_index, (glyphs, width)) in glyphs_per_line.iter().enumerate() {
+                for glyph in glyphs {
+                    if let Some(bounding_box) = glyph.pixel_bounding_box() {
+                        glyph.draw(|_x, _y, v| {
+                            let x = _x + std::cmp::max(0, bounding_box.min.x) as u32;
+                            let y = _y + std::cmp::max(0, bounding_box.min.y) as u32;
+                            if x < *width as u32 && y < size as u32 {
+                                let pixel = imgbuf.get_pixel_mut(x, y + (line_index * size as usize) as u32);
+                                *pixel = image::Rgba([255, 255, 255, (255.0 * v) as u8]);
+                            }
+                        });
+                    }
                 }
             }
+
+            imgbuf.save("sv.png");
             Image::from_raw(gfx,
                             &imgbuf.into_raw(),
-                            width as u32,
+                            max_width as u32,
                             height as u32,
                             PixelFormat::RGBA)
         }
@@ -81,6 +98,7 @@ pub mod tileset {
         Result
     };
     use crate::font::Font;
+    use crate::glyph::Glyph;
 
     pub struct Tileset {
         image: Image,
@@ -89,15 +107,23 @@ pub mod tileset {
 
     impl Tileset {
         pub async fn from_font(gfx: &Graphics, path: &str) -> Result<Tileset> {
-            let glyphs = "ab";
+            let lines = r#"╦╩═╬╧╨╤╥╙╘╒╓╫╪┘╠┌█▄▌▐▀αßΓπΣσµτΦδ∞φ╟╚╔║╗╝╣╢╖
+*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQ⌠⌡≥
+RSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxy÷≈
+z{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°∙
+óúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╕╜╛┐└┴┬├─┼╞·√±≤ⁿε∩≡ΘΩ
+"☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼!#$%&'()²■"#;
             let font = Font::load(path).await.expect("failed to load font");
-            let font_image = font.render(&gfx, &glyphs, 100.0).expect("failed to load font image");
-            let tile_size_px = Vector::new(100, 100);
+            let size = 40.0;
+            let font_image = font.render(&gfx, &lines, size).expect("failed to load font image");
+            let tile_size_px = Vector::new(size, size);
             let mut map = HashMap::new();
-            for (index, glyph) in glyphs.chars().enumerate() {
-                let pos = (index as i32 * tile_size_px.x as i32, 0);
-                let rect = Rectangle::new(pos, tile_size_px);
-                map.insert(glyph, rect);
+            for (line_num, glyphs) in lines.lines().enumerate() {
+                for (index, glyph) in glyphs.chars().enumerate() {
+                    let pos = (index as i32 * tile_size_px.x as i32, (line_num * tile_size_px.y as usize) as i32);
+                    let rect = Rectangle::new(pos, tile_size_px);
+                    map.insert(glyph, rect);
+                }
             }
             Ok(
                 Tileset {
@@ -106,10 +132,71 @@ pub mod tileset {
                 }
             )
         }
-        pub fn draw(&self, gfx: &mut Graphics, glyph: char, pos: Rectangle) {
+        pub fn draw(&self, gfx: &mut Graphics, glyph: &Glyph, pos: Rectangle) {
+            let image = &self.image;
+            let rect = self.map.get(&glyph.ch).unwrap();
+            if let Some(background) = &glyph.background {
+                gfx.fill_rect(&pos, *background);
+            }
+            if let Some(foreground) = &glyph.foreground {
+                gfx.draw_subimage_tinted(image, *rect, pos, *foreground);
+            } else {
+                gfx.draw_subimage(image, *rect, pos);
+            }
+        }
+        pub fn draw_char(&self, gfx: &mut Graphics, glyph: char, pos: Rectangle) {
             let image = &self.image;
             let rect = self.map.get(&glyph).unwrap();
-            gfx.draw_subimage(image, *rect, pos);
+            println!("{:?}", rect);
+            let r = Rectangle::new((rect.pos.x + 1.0, rect.pos.y + 1.0), (rect.size.x - 2.0, rect.size.y - 2.0));
+            gfx.draw_subimage(image, r, pos);
+        }
+    }
+}
+
+pub mod glyph {
+    use quicksilver::graphics::Color;
+
+    pub struct Glyph {
+        pub ch: char,
+        pub foreground: Option<Color>,
+        pub background: Option<Color>,
+    }
+}
+
+pub mod grid {
+    use quicksilver::{
+        geom::{Rectangle, Vector}
+    };
+
+    pub struct Grid {
+        width_multi: u32,
+        height_multi: u32
+    }
+
+    impl Grid {
+        pub fn from_screen_size(grid_size: impl Into<Vector>, screen_size: impl Into<Vector>) -> Self {
+            let grid = grid_size.into();
+            let screen = screen_size.into();
+            Grid {
+                width_multi: (screen.x / grid.x) as u32,
+                height_multi: (screen.y / grid.y) as u32,
+            }
+        }
+
+        pub fn from_tile_size(tile_size: impl Into<Vector>) -> Self {
+            let tile = tile_size.into();
+            Grid {
+                width_multi: tile.x as u32,
+                height_multi: tile.y as u32,
+            }
+        }
+
+        pub fn rect(&self, x: u32, y: u32) -> Rectangle {
+            Rectangle::new(
+                (self.width_multi * x, self.height_multi * y),
+                (self.width_multi, self.height_multi)
+            )
         }
     }
 }
@@ -119,13 +206,28 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     // Clear the screen to a blank, black color
     // let mut font = font::Font::load("square.ttf").await?;
     // let img = font.render(&gfx, "12", 100.0).unwrap();
-    let tileset = tileset::Tileset::from_font(&gfx, "square.ttf").await?;
-    gfx.clear(Color::BLACK);
+    let tileset = tileset::Tileset::from_font(&gfx, "Px437_PhoenixEGA_8x8.ttf").await?;
+    gfx.clear(Color::BLUE);
     // Paint a triangle with red, green, and blue vertices, blending the colors for the pixels in-between
     // Define the 3 vertices and move them inside a Vec
     let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
     gfx.fill_rect(&rect, Color::RED);
-    tileset.draw(&mut gfx, 'a', Rectangle::new((0.0, 0.0), (200.0, 100.0)));
+    let glyph = glyph::Glyph {
+        ch: 'a',
+        foreground: Some(Color::GREEN),
+        background: None,
+    };
+    let grid = grid::Grid::from_tile_size((10.0, 10.0));
+    tileset.draw_char(&mut gfx, '╔', grid.rect(0, 0));
+    tileset.draw_char(&mut gfx, '╦', grid.rect(1, 0));
+    tileset.draw_char(&mut gfx, '╗', grid.rect(2, 0));
+    tileset.draw_char(&mut gfx, '╠', grid.rect(0, 1));
+    tileset.draw_char(&mut gfx, '╬', grid.rect(1, 1));
+    tileset.draw_char(&mut gfx, '╣', grid.rect(2, 1));
+    tileset.draw_char(&mut gfx, '╚', grid.rect(0, 2));
+    tileset.draw_char(&mut gfx, '☻', grid.rect(1, 2));
+    tileset.draw_char(&mut gfx, '☺', grid.rect(2, 2));
+
     // Send the data to be drawn
     gfx.present(&window)?;
     loop {
