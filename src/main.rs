@@ -335,28 +335,35 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let maze = maze_renderer(&maze_vec);
 
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_PhoenixEGA_8x8.ttf").await?;
-    gfx.clear(Color::WHITE);
+
     // let rect = Rectangle::new(Vector::new(350.0, 100.0), Vector::new(100.0, 100.0));
     // gfx.fill_rect(&rect, Color::RED);
     let grid = grid::Grid::from_tile_size((10.0, 10.0));
-    for (glyph, pos) in maze {
-        tileset.draw(&mut gfx, &glyph, grid.rect(pos.x as u32 + 2, pos.y as u32 + 2));
-    }
-    let result = dijkstra(&start, |p| visitable_tiles(p, &maze_vec), |p| *p == Pos(71, 1));
-    let mut path: Vec<(Glyph, Pos)> = vec![];
-    if let Some((p, _)) = result {
-        for pos in p {
-            let glyph = Glyph {
-                    ch: '▒',
-                    foreground: Some(Color::GREEN),
-                    background: None
-                };
-            tileset.draw(&mut gfx, &glyph, grid.rect(pos.0 as u32 + 2, pos.1 as u32 + 2));
-        }
-    }
 
-    gfx.present(&window)?;
+    let (mut path, _) = dijkstra(&start, |p| visitable_tiles(p, &maze_vec), |p| *p == Pos(71, 1)).unwrap();
+
+
+    let mut drawn_path = vec![];
+
+
     loop {
         while let Some(_) = events.next_event().await {}
+        let next = path.pop();
+        if let Some(pos) = next {
+            let glyph = Glyph {
+                ch: '▒',
+                foreground: Some(Color::GREEN),
+                background: None
+            };
+            gfx.clear(Color::WHITE);
+            drawn_path.push((glyph, pos));
+            for (glyph, pos) in &maze {
+                tileset.draw(&mut gfx, glyph, grid.rect(pos.x as u32 + 2, pos.y as u32 + 2));
+            }
+            for (glyph, pos) in &drawn_path {
+                tileset.draw(&mut gfx, &glyph, grid.rect(pos.0 as u32 + 2, pos.1 as u32 + 2));
+            }
+            gfx.present(&window)?;
+        }
     }
 }
