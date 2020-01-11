@@ -13,23 +13,26 @@ pub struct Tileset {
 }
 
 impl Tileset {
-    pub async fn from_font(gfx: &Graphics, path: &str) -> Result<Tileset> {
+    pub async fn from_font(gfx: &Graphics, path: &str, ratio: f32) -> Result<Tileset> {
         let lines = r#"╦╩═╬╧╨╤╥╙╘╒╓╫╪┘╠┌█▄▌▐▀αßΓπΣσµτΦδ∞φ╟╚╔║╗╝╣╢╖
 *+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQ⌠⌡≥
 RSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxy÷≈
-z{|} ~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°∙
+z{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°∙
 óúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╕╜╛┐└┴┬├─┼╞·√±≤ⁿε∩≡ΘΩ
 "☺☻♥♦♣♠•◘○◙♂♀♪♫☼►◄↕‼¶§▬↨↑↓→←∟↔▲▼!#$%&'()²■"#;
         let font = Font::load(path).await.expect("failed to load font");
         let size = 40.0;
-        let font_image = font.render(&gfx, &lines, size).expect("failed to load font image");
-        let tile_size_px = Vector::new(size, size);
+        let tile_size_px: Vector = (size / ratio, size).into();
+        let (font_image, mut width_vec) = font.render(&gfx,
+                                                      &lines,
+                                                      size,
+                                                      ratio).expect("failed to load font image");
         let mut map = HashMap::new();
-        for (line_num, glyphs) in lines.lines().enumerate() {
-            for (index, glyph) in glyphs.chars().enumerate() {
-                let pos = (index as i32 * tile_size_px.x as i32, (line_num * tile_size_px.y as usize) as i32);
-                let rect = Rectangle::new(pos, tile_size_px);
-                map.insert(glyph, rect);
+        let glyph_index = 0;
+        width_vec.reverse();
+        for glyphs in lines.lines() {
+            for glyph in glyphs.chars() {
+                map.insert(glyph, width_vec.pop().unwrap());
             }
         }
         Ok(
@@ -55,7 +58,6 @@ z{|} ~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°
     pub fn draw_char(&self, gfx: &mut Graphics, glyph: char, pos: Rectangle) {
         let image = &self.image;
         let rect = self.map.get(&glyph).unwrap();
-        let r = Rectangle::new((rect.pos.x + 1.0, rect.pos.y + 1.0), (rect.size.x - 2.0, rect.size.y - 2.0));
-        gfx.draw_subimage(image, r, pos);
+        gfx.draw_subimage(image, *rect, pos);
     }
 }

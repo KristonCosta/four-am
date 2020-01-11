@@ -1,7 +1,8 @@
 use std::path::Path;
-use rusttype::{Font as RTFont, Scale, point, PositionedGlyph};
+use rusttype::{Font as RTFont, Scale, point, PositionedGlyph, Point};
 use quicksilver::{Result, load_file};
 use quicksilver::graphics::{Graphics, Image, PixelFormat};
+use quicksilver::geom::{Vector, Rectangle};
 
 pub struct Font {
     pub(crate) data: RTFont<'static>
@@ -18,9 +19,9 @@ impl Font {
         )
     }
 
-    pub fn render(&self, gfx: &Graphics, text: &str, size: f32) -> Result<Image> {
+    pub fn render(&self, gfx: &Graphics, text: &str, size: f32, ratio: f32) -> Result<(Image, Vec<Rectangle>)> {
         // Most of this is either from, or inspired by, quicksilver
-        let scale = Scale::uniform(size);
+        let scale = Scale::uniform(40.0);
         let line_count = text.lines().count();
         let glyphs_per_line = text
             .lines()
@@ -40,9 +41,18 @@ impl Font {
         let max_width = round_pow_2(base_width as i32) as usize;
         let height = round_pow_2((size * (line_count as f32)).ceil() as i32) as usize;
         let mut imgbuf = image::ImageBuffer::new(max_width as u32, height as u32);
+        let mut rect_vec = vec![];
         for (line_index, (glyphs, width)) in glyphs_per_line.iter().enumerate() {
             for glyph in glyphs {
                 if let Some(bounding_box) = glyph.pixel_bounding_box() {
+                    let mut origin = glyph.position();
+                    origin.x = origin.x.round();
+                    origin.y = origin.y.round();
+                    let glyph_size = glyph.scale();
+                    rect_vec.push( Rectangle::new(
+                        Vector::new(origin.x + 1.0, (line_index * size as usize) as u32 + 1),
+                        Vector::new(glyph_size.x / ratio - 2.0, glyph_size.y - 2.0)
+                    ));
                     glyph.draw(|_x, _y, v| {
                         let x = _x + std::cmp::max(0, bounding_box.min.x) as u32;
                         let y = _y + std::cmp::max(0, bounding_box.min.y) as u32;
@@ -54,11 +64,12 @@ impl Font {
                 }
             }
         }
-        Image::from_raw(gfx,
+        let img = Image::from_raw(gfx,
                         &imgbuf.into_raw(),
                         max_width as u32,
                         height as u32,
-                        PixelFormat::RGBA)
+                        PixelFormat::RGBA).unwrap();
+        Ok((img, rect_vec))
     }
 }
 

@@ -74,6 +74,21 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
 }
 
 
+pub fn make_char(state: &mut State, ch: char, pos: (i32, i32)) {
+    state.ecs
+        .create_entity()
+        .with(component::Position { x: pos.0, y: pos.1 })
+        .with(component::Renderable {
+            glyph: Glyph {
+                ch: ch,
+                foreground: Some(Color::YELLOW),
+                background: None,
+            }
+        })
+        .build();
+}
+
+
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
 
     let mut gs = State {
@@ -83,22 +98,16 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     gs.ecs.register::<component::Position>();
     gs.ecs.register::<component::Renderable>();
     gs.ecs.register::<component::Player>();
-    gs.ecs
-        .create_entity()
-        .with(component::Position { x: 40, y: 25 })
-        .with(component::Renderable {
-            glyph: Glyph {
-                ch: '@',
-                foreground: Some(Color::YELLOW),
-                background: None,
-            }
-        })
-        .with(component::Player{})
-        .build();
-    let tileset = tileset::Tileset::from_font(&gfx, "Px437_PhoenixEGA_8x8.ttf").await?;
+    make_char(&mut gs, '╔', (10, 10));
+    make_char(&mut gs, '╗', (12, 10));
+    make_char(&mut gs, '╦', (11, 10));
+    make_char(&mut gs, '║', (10, 11));
+    make_char(&mut gs, '╝', (12, 11));
+    make_char(&mut gs, '╚', (11, 11));
 
-    let grid = grid::Grid::from_tile_size((10.0, 10.0));
+    let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0/8.0).await?;
 
+    let grid = grid::Grid::from_tile_size((10.0, 20.0));
 
     loop {
         while let Some(event) = events.next_event().await {
