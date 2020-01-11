@@ -29,11 +29,19 @@ jobs:
           path: ./target
           key: ${{ runner.os }}_nightly-2019-11-25_${{ hashFiles('Cargo.lock') }}
 
+      - name: Cache Cargo Web 
+        uses: actions/cache@v1
+        with:
+          path: ./cargo-web-target
+          key: ${{ runner.os }}_nightly-2019-11-25_cargo-web-target
+
       - name: Get Cargo Web
         uses: actions-rs/cargo@v1 
         with: 
           command: install
           args: cargo-web
+        env: 
+          CARGO_TARGET_DIR: ./cargo-web-target/ 
       
       - name: Build Web 
         uses: actions-rs/cargo@v1 
