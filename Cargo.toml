@@ -11,9 +11,13 @@ rusttype = "0.8.2"
 image = "0.23.0-preview.0"
 console_error_panic_hook = "0.1.6"
 pathfinding = "2.0.3"
+specs-derive = "0.4.0"
+
+[dependencies.specs]
+version = "0.15.1"
+default-features = false
 
 [dependencies.quicksilver]
 git = "https://github.com/ryanisaacg/quicksilver"
 branch = "master"
-
 features = ["saving", "stdweb"]
