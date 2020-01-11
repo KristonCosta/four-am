@@ -7,7 +7,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@master
-      - uses: actions-rs/cargo@v1
+      - name: Get libs
+        run: sudo apt-get install libudev-dev libsystemd-dev
+      - name: Build
+        uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release --all-features
+      - name: Get Cargo Web
+        uses: actions-rs/cargo@v1 
+        with: 
+          command: install
+          args: web
+      - name: Build Web 
+        uses: actions-rs/cargo@v1 
+        with:
+          command: web
+          args: deploy
+      - name: Deploy  
+        if: github.ref == 'refs/heads/master'
+        uses: JamesIves/github-pages-deploy-action@releases/v3
+        with: 
+          ACCESS_TOKEN: ${{ secrets.GH_PAT }}
+          BRANCH: gh-pages 
+          FOLDER: target/deploy
