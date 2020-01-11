@@ -18,7 +18,7 @@ jobs:
         uses: actions-rs/cargo@v1 
         with: 
           command: install
-          args: web
+          args: cargo-web
       - name: Build Web 
         uses: actions-rs/cargo@v1 
         with:
