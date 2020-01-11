@@ -25,9 +25,9 @@ impl Grid {
         }
     }
 
-    pub fn rect(&self, x: i32, y: i32) -> Rectangle {
+    pub fn rect(&self, x: f32, y: f32) -> Rectangle {
         Rectangle::new(
-            (self.width_multi * x, self.height_multi * y),
+            (self.width_multi * x as i32, self.height_multi * y as i32),
             (self.width_multi, self.height_multi)
         )
     }
