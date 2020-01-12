@@ -18,6 +18,8 @@ use std::slice::Iter;
 use crate::map::{SimpleMapBuilder, MapBuilder, Map, TileType};
 use std::panic;
 use rand::Rng;
+use crate::component::{Position, Name};
+
 pub mod font;
 pub mod tileset;
 pub mod glyph;
@@ -203,8 +205,18 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
 pub fn handle_click(gs: &mut State, raw: (i32, i32), pos: (i32, i32)) {
     {
         let mut log = gs.ecs.write_resource::<GameLog>();
-        log.push(&format!("Clicked on tile: {} {}", pos.0, pos.1), Some(Color::RED), None);
-        log.push(&format!("Raw on tile: {} {}", raw.0, raw.1), Some(Color::GREEN), None);
+
+        let names = gs.ecs.read_storage::<Name>();
+        let positions = gs.ecs.read_storage::<Position>();
+        println!("{:?}", pos);
+        for (name, position) in (&names, &positions).join() {
+            println!("{:?} {:?} {}", name.name, position.x, position.y);
+            if position.x == pos.0 && position.y == pos.1 {
+                log.push(&format!("You clicked on {}", name.name),
+                        Some(Color::GREEN),
+                        None);
+            }
+        }
     }
 
 }
@@ -286,6 +298,8 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     gs.ecs.register::<component::Position>();
     gs.ecs.register::<component::Renderable>();
     gs.ecs.register::<component::Player>();
+    gs.ecs.register::<component::Name>();
+
     gs.ecs
         .create_entity()
         .with(component::Position { x: position.0, y: position.1 })
@@ -297,6 +311,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             }
         })
         .with(component::Player{})
+        .with(component::Name{name: "Player".to_string() })
         .build();
 
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0/8.0).await?;
@@ -334,6 +349,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     position
                 } => {
                     let scale = window.scale_factor();
+                    
                     let mut mouse = gs.ecs.write_resource::<MouseState>();
                     mouse.x = position.x as i32 / scale as i32;
                     mouse.y = position.y as i32 / scale as i32;
