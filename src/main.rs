@@ -178,6 +178,10 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
                 log.push(&format!("Ouch, you hit a wall!"), Some(Color::RED), None);
             }
         } else {
+            {
+                let mut log = ecs.write_resource::<GameLog>();
+                log.push(&format!("Walkin' along~"), Some(Color::GREEN), None);
+            }
             pos.x = desired_x;
             pos.y = desired_y;
         }
