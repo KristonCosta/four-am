@@ -13,7 +13,7 @@ use crate::glyph::Glyph;
 use specs::prelude::*;
 use crate::grid::Grid;
 use crate::tileset::Tileset;
-use crate::ui::draw_box;
+use crate::ui::{draw_box, print};
 
 pub mod font;
 pub mod tileset;
@@ -119,13 +119,25 @@ pub mod ui {
         ctx.draw(gfx, &bottom_right, (rect.pos.x + rect.size.x, rect.pos.y + rect.size.y));
         let (x_start, x_end) = (rect.pos.x as i32, (rect.pos.x + rect.size.x) as i32);
         let (y_start, y_end) = (rect.pos.y as i32, (rect.pos.y + rect.size.y) as i32);
-        for x in (x_start+1)..x_end {
+        for x in (x_start + 1)..x_end {
             ctx.draw(gfx, &horizontal, (x as f32, y_start as f32));
             ctx.draw(gfx, &horizontal, (x as f32, y_end as f32));
         }
-        for y in (y_start+1)..y_end {
+        for y in (y_start + 1)..y_end {
             ctx.draw(gfx, &vertical, (x_start as f32, y as f32));
             ctx.draw(gfx, &vertical, (x_end as f32, y as f32));
+        }
+    }
+
+    pub fn print(gfx: &mut Graphics,
+                 ctx: &TileContext,
+                 text: &str,
+                 pos: (i32, i32),
+                 fg: Option<Color>,
+                 bg: Option<Color>) {
+        for (index, ch) in text.chars().enumerate() {
+            let ch = Glyph::from(ch, fg, bg);
+            ctx.draw(gfx, &ch, (pos.0 as f32 + index as f32, pos.1 as f32));
         }
     }
 }
@@ -195,6 +207,9 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((10.0, 10.0), (6.0, 6.0)), None, None);
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((20.0, 30.0), (10.0, 2.0)), None, None);
+
+        print(&mut gfx, &tile_ctx, "Hello, world!", (1, 44), Some(Color::GREEN), None);
+
         gfx.present(&window)?;
     }
 }

@@ -44,10 +44,14 @@ z{|}~⌂ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáí°�
     }
     pub fn draw(&self, gfx: &mut Graphics, glyph: &Glyph, pos: Rectangle) {
         let image = &self.image;
-        let rect = self.map.get(&glyph.ch).unwrap();
+
         if let Some(background) = &glyph.background {
             gfx.fill_rect(&pos, *background);
         }
+        if glyph.ch == ' ' {
+            return
+        }
+        let rect = self.map.get(&glyph.ch).unwrap();
         if let Some(foreground) = &glyph.foreground {
             gfx.draw_subimage_tinted(image, *rect, pos, *foreground);
         } else {
