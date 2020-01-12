@@ -17,6 +17,7 @@ use crate::ui::{draw_box, print, print_glyphs};
 use std::slice::Iter;
 use crate::map::{SimpleMapBuilder, MapBuilder, Map, TileType};
 use std::panic;
+use rand::Rng;
 pub mod font;
 pub mod tileset;
 pub mod glyph;
@@ -25,7 +26,6 @@ pub mod ui;
 pub mod component;
 
 fn main() {
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
     run(
         Settings {
             size: Vector::new(800.0, 600.0).into(),
@@ -41,6 +41,7 @@ pub mod map {
     use specs::Entity;
     use quicksilver::geom::{Rectangle, Shape};
     use std::cmp::{min, max};
+    use rand::{Rng, SeedableRng};
 
     pub const MAPWIDTH : usize = 80;
     pub const MAPHEIGHT : usize = 43;
@@ -97,20 +98,20 @@ pub mod map {
     }
     impl SimpleMapBuilder {
         pub fn rooms_and_corridors(map: &mut Map) -> (i32, i32) {
-            // let mut rng = rand::thread_rng();
+            let mut rng = rand::thread_rng();
 
             const MAX_ROOMS : i32 = 30;
             const MIN_SIZE : i32 = 6;
             const MAX_SIZE : i32 = 10;
             let mut rooms: Vec<Rectangle> = vec![];
             for i in 0..MAX_ROOMS {
-                let w = 10; // rng.gen_range(MIN_SIZE, MAX_SIZE);
-                let h = 10; // rng.gen_range(MIN_SIZE, MAX_SIZE);
-                let x = 10; // rng.gen_range(1, map.size.0 - w - 1) - 1;
-                let y = 10;// rng.gen_range(1, map.size.1 - h - 1) - 1;
+                let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
+                let h = rng.gen_range(MIN_SIZE, MAX_SIZE);
+                let x = rng.gen_range(1, map.size.0 - w - 1) - 1;
+                let y = rng.gen_range(1, map.size.1 - h - 1) - 1;
                 let new_room = Rectangle::new((x, y), (w, h));
                 create_room(map, &new_room);
-              /*  if !rooms.is_empty() {
+                if !rooms.is_empty() {
                     let center = new_room.center();
                     let prev = rooms[rooms.len() - 1].center();
                     if rng.gen_range(0, 2) == 1 {
@@ -120,7 +121,7 @@ pub mod map {
                         dig_horizontal(map, prev.x as i32, center.x as i32, center.y as i32);
                         dig_vertical(map, prev.y as i32, center.y as i32, prev.x as i32);
                     }
-                }*/
+                }
                 rooms.push(new_room);
             }
             let center = rooms[0].center();
@@ -169,7 +170,6 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
     for (_player, pos) in (&mut players, &mut positions).join() {
         let desired_x = min(79, max(0, pos.x + delta_x));
         let desired_y = min(49, max(0, pos.y + delta_y));
-        println!("{} {}", desired_x, desired_y);
 
         let map = ecs.fetch::<Map>();
         if map.blocked[map.coord_to_index(desired_x, desired_y)] {
@@ -344,7 +344,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                         let mut raw = (0, 0);
                         {
                             let mut mouse = gs.ecs.fetch::<MouseState>();
-                            println!("{:?} {:?}", mouse.x, mouse.y);
                             raw = (mouse.x, mouse.y);
                             pos = tile_ctx.grid.point_to_grid(mouse.x as f32, mouse.y as f32);
                         }
@@ -356,6 +355,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             }
         }
         gfx.clear(Color::BLACK);
+
         let offset = 44;
         let mut map = gs.ecs.fetch::<Map>();
         for x in 0..map::MAPWIDTH {

@@ -12,9 +12,9 @@ walkdir = "2.2.9"
 [dependencies]
 rusttype = "0.8.2"
 image = "0.23.0-preview.0"
-console_error_panic_hook = "0.1.6"
 pathfinding = "2.0.3"
 specs-derive = "0.4.0"
+rand = { version = "0.6.5", features = ["stdweb"] }
 
 [dependencies.specs]
 version = "0.15.1"
