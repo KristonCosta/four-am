@@ -31,4 +31,8 @@ impl Grid {
             (self.width_multi, self.height_multi)
         )
     }
+
+    pub fn point_to_grid(&self, x: f32, y: f32) -> (i32, i32) {
+        ((x / self.width_multi as f32) as i32, (y / self.height_multi as f32) as i32)
+    }
 }

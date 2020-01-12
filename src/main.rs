@@ -20,33 +20,14 @@ pub mod font;
 pub mod tileset;
 pub mod glyph;
 pub mod grid;
-
-pub mod component {
-    use specs::prelude::*;
-    use quicksilver::graphics::Color;
-    use crate::glyph;
-
-    #[derive(Component)]
-    pub struct Position {
-        pub x: i32,
-        pub y: i32,
-    }
-
-    #[derive(Component)]
-    pub struct Renderable {
-        pub glyph: glyph::Glyph,
-    }
-
-    #[derive(Component)]
-    pub struct Player;
-
-}
+pub mod ui;
+pub mod component;
 
 fn main() {
     run(
         Settings {
             size: Vector::new(800.0, 600.0).into(),
-            title: "RGB Triangle Example",
+            title: "Whoa",
             ..Settings::default()
         },
         app,
@@ -69,6 +50,10 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
 
 pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
     if state == ElementState::Pressed {
+        {
+            let mut log = gs.ecs.write_resource::<GameLog>();
+            log.push(&format!("Test message: {:?}", key), Some(Color::RED), None);
+        }
         match key {
             Key::W => try_move_player(0, -1, &mut gs.ecs),
             Key::A => try_move_player(-1, 0, &mut gs.ecs),
@@ -77,6 +62,15 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
             _ => {}
         }
     }
+}
+
+pub fn handle_click(gs: &mut State, raw: (i32, i32), pos: (i32, i32)) {
+    {
+        let mut log = gs.ecs.write_resource::<GameLog>();
+        log.push(&format!("Clicked on tile: {} {}", pos.0, pos.1), Some(Color::RED), None);
+        log.push(&format!("Raw on tile: {} {}", raw.0, raw.1), Some(Color::GREEN), None);
+    }
+
 }
 
 
@@ -92,65 +86,6 @@ pub fn make_char(state: &mut State, ch: char, pos: (i32, i32)) {
             }
         })
         .build();
-}
-
-pub mod ui {
-    use quicksilver::geom::Rectangle;
-    use quicksilver::graphics::{Color, Graphics};
-    use crate::grid::Grid;
-    use crate::TileContext;
-    use crate::glyph::Glyph;
-
-
-    pub fn draw_box(gfx: &mut Graphics,
-                    ctx: &TileContext,
-                    rect: Rectangle,
-                    fg: Option<Color>,
-                    bg: Option<Color>) {
-        let top_left = Glyph::from('╔', fg, bg);
-        let top_right = Glyph::from('╗', fg, bg);
-        let bottom_left = Glyph::from('╚', fg, bg);
-        let bottom_right = Glyph::from('╝', fg, bg);
-        let vertical = Glyph::from('║', fg, bg);
-        let horizontal = Glyph::from('═', fg, bg);
-
-        ctx.draw(gfx, &top_left, (rect.pos.x, rect.pos.y));
-        ctx.draw(gfx, &top_right, (rect.pos.x + rect.size.x, rect.pos.y));
-        ctx.draw(gfx, &bottom_left, (rect.pos.x, rect.pos.y + rect.size.y));
-        ctx.draw(gfx, &bottom_right, (rect.pos.x + rect.size.x, rect.pos.y + rect.size.y));
-        let (x_start, x_end) = (rect.pos.x as i32, (rect.pos.x + rect.size.x) as i32);
-        let (y_start, y_end) = (rect.pos.y as i32, (rect.pos.y + rect.size.y) as i32);
-        for x in (x_start + 1)..x_end {
-            ctx.draw(gfx, &horizontal, (x as f32, y_start as f32));
-            ctx.draw(gfx, &horizontal, (x as f32, y_end as f32));
-        }
-        for y in (y_start + 1)..y_end {
-            ctx.draw(gfx, &vertical, (x_start as f32, y as f32));
-            ctx.draw(gfx, &vertical, (x_end as f32, y as f32));
-        }
-    }
-
-    pub fn print(gfx: &mut Graphics,
-                 ctx: &TileContext,
-                 text: &str,
-                 pos: (i32, i32),
-                 fg: Option<Color>,
-                 bg: Option<Color>) {
-        for (index, ch) in text.chars().enumerate() {
-            let ch = Glyph::from(ch, fg, bg);
-            ctx.draw(gfx, &ch, (pos.0 as f32 + index as f32, pos.1 as f32));
-        }
-    }
-
-    pub fn print_glyphs(gfx: &mut Graphics,
-                        ctx: &TileContext,
-                        glyphs: &Vec<Glyph>,
-                        pos: (i32, i32)) {
-        for (index, glyph) in glyphs.iter().enumerate() {
-            ctx.draw(gfx, &glyph, (pos.0 as f32 + index as f32, pos.1 as f32));
-        }
-    }
-
 }
 
 pub struct GameLog {
@@ -187,6 +122,11 @@ impl GameLog {
     }
 }
 
+pub struct MouseState {
+    pub x: i32,
+    pub y: i32,
+}
+
 pub struct TileContext {
     grid: Grid,
     tileset: Tileset,
@@ -200,11 +140,9 @@ impl TileContext {
 }
 
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
-
     let mut gs = State {
         ecs: World::new(),
     };
-
     gs.ecs.register::<component::Position>();
     gs.ecs.register::<component::Renderable>();
     gs.ecs.register::<component::Player>();
@@ -231,6 +169,16 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
 
     let mut log = GameLog::with_length(5);
     log.push("Hello, world!", Some(Color::GREEN), None);
+
+    gs.ecs.insert(log);
+
+    let mouse = MouseState {
+        x: 0,
+        y: 0,
+    };
+
+    gs.ecs.insert(mouse);
+
     loop {
         while let Some(event) = events.next_event().await {
             match event {
@@ -238,12 +186,34 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     key,
                     state
                 } => {
-                    if (state == ElementState::Pressed) {
-                        log.push(&format!("Test message: {:?}", key), Some(Color::RED), None);
-                    }
-
-
                     handle_key(&mut gs, key, state)
+                },
+                Event::MouseMoved {
+                    pointer,
+                    position
+                } => {
+                    let scale = window.scale_factor();
+                    let mut mouse = gs.ecs.write_resource::<MouseState>();
+                    mouse.x = position.x as i32 / scale as i32;
+                    mouse.y = position.y as i32 / scale as i32;
+                },
+                Event::MouseInput {
+                    pointer,
+                    state,
+                    button,
+                } => {
+                    if state == ElementState::Pressed {
+                        let mut pos = (0, 0);
+                        let mut raw = (0, 0);
+                        {
+                            let mut mouse = gs.ecs.fetch::<MouseState>();
+                            println!("{:?} {:?}", mouse.x, mouse.y);
+                            raw = (mouse.x, mouse.y);
+                            pos = tile_ctx.grid.point_to_grid(mouse.x as f32, mouse.y as f32);
+                        }
+
+                        handle_click(&mut gs, raw, pos);
+                    }
                 },
                 _ => (),
             }
@@ -259,7 +229,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((10.0, 10.0), (6.0, 6.0)), None, None);
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((20.0, 30.0), (10.0, 2.0)), None, None);
-
+        let log = gs.ecs.fetch::<GameLog>();
         for (index, glyphs) in log.iter().enumerate() {
             print_glyphs(&mut gfx, &tile_ctx, &glyphs, (1, (44 + index) as i32));
         }
