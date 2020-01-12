@@ -24,3 +24,6 @@ default-features = false
 git = "https://github.com/ryanisaacg/quicksilver"
 branch = "master"
 features = ["saving", "stdweb"]
+
+[patch.crates-io]
+winit = { git = 'https://github.com/rust-windowing/winit.git', branch = 'master', features = ['stdweb'] }

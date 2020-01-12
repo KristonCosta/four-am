@@ -65,7 +65,7 @@ impl Font {
             }
         }
         let img = Image::from_raw(gfx,
-                        &imgbuf.into_raw(),
+                        Some(&imgbuf.into_raw()),
                         max_width as u32,
                         height as u32,
                         PixelFormat::RGBA).unwrap();

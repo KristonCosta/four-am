@@ -19,6 +19,7 @@ use crate::map::{SimpleMapBuilder, MapBuilder, Map, TileType};
 use std::panic;
 use rand::Rng;
 use crate::component::{Position, Name};
+use crate::camera::{render_camera, get_screen_bounds};
 
 pub mod font;
 pub mod tileset;
@@ -26,6 +27,7 @@ pub mod glyph;
 pub mod grid;
 pub mod ui;
 pub mod component;
+pub mod map;
 
 fn main() {
     run(
@@ -38,125 +40,80 @@ fn main() {
     );
 }
 
+pub mod camera {
+    use specs::{World, WorldExt};
+    use crate::{TileContext, component, Focus};
+    use crate::map::{Map, TileType};
+    use crate::glyph::Glyph;
+    use quicksilver::graphics::{Color, Graphics};
+    use specs::join::Join;
+    use quicksilver::geom::Rectangle;
 
-pub mod map {
-    use specs::Entity;
-    use quicksilver::geom::{Rectangle, Shape};
-    use std::cmp::{min, max};
-    use rand::{Rng, SeedableRng};
+    // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
+    pub fn render_camera(gfx: &mut Graphics, ecs: &World, ctx: &TileContext, region: Rectangle) {
+        let map = ecs.fetch::<Map>();
 
-    pub const MAPWIDTH : usize = 80;
-    pub const MAPHEIGHT : usize = 43;
-    pub const MAPCOUNT : usize = MAPHEIGHT * MAPWIDTH;
+        let (min_x, max_x, min_y, max_y) = get_screen_bounds(ecs, ctx);
+        let (map_width, map_height) = map.size;
 
-    #[derive(Clone)]
-    pub enum TileType {
-        Wall,
-        Floor,
-    }
-
-    #[derive(Default)]
-    pub struct Map {
-        pub tiles: Vec<TileType>,
-        pub size: (i32, i32),
-        pub revealed_tiles: Vec<bool>,
-        pub visible_tiles: Vec<bool>,
-        pub blocked: Vec<bool>,
-        pub depth: i32,
-        pub tile_content: Vec<Vec<Entity>>
-    }
-
-    // Base taken from https://bfnightly.bracketproductions.com/rustbook/chapter_23.html
-    impl Map {
-        pub fn new(depth: i32) -> Self {
-            Map {
-                tiles: vec![TileType::Wall; MAPCOUNT],
-                size: (MAPWIDTH as i32, MAPHEIGHT as i32),
-                revealed_tiles: vec![false; MAPCOUNT],
-                visible_tiles: vec![false; MAPCOUNT],
-                blocked: vec![true; MAPCOUNT],
-                depth,
-                tile_content: vec![Vec::new(); MAPCOUNT],
-            }
-        }
-        pub fn coord_to_index(&self, x: i32, y: i32) -> usize {
-            (y as usize * self.size.0 as usize) + x as usize
-        }
-    }
-
-    pub(crate) trait MapBuilder {
-        fn build(depth: i32) -> (Map, (i32, i32)) ;
-    }
-
-    pub struct SimpleMapBuilder {}
-
-    impl MapBuilder for SimpleMapBuilder {
-        fn build(depth: i32) -> (Map, (i32, i32)) {
-            let mut map = Map::new(depth);
-            let start_pos = SimpleMapBuilder::rooms_and_corridors(&mut map);
-            (map, start_pos)
-        }
-
-    }
-    impl SimpleMapBuilder {
-        pub fn rooms_and_corridors(map: &mut Map) -> (i32, i32) {
-            let mut rng = rand::thread_rng();
-
-            const MAX_ROOMS : i32 = 30;
-            const MIN_SIZE : i32 = 6;
-            const MAX_SIZE : i32 = 10;
-            let mut rooms: Vec<Rectangle> = vec![];
-            for i in 0..MAX_ROOMS {
-                let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
-                let h = rng.gen_range(MIN_SIZE, MAX_SIZE);
-                let x = rng.gen_range(1, map.size.0 - w - 1) - 1;
-                let y = rng.gen_range(1, map.size.1 - h - 1) - 1;
-                let new_room = Rectangle::new((x, y), (w, h));
-                create_room(map, &new_room);
-                if !rooms.is_empty() {
-                    let center = new_room.center();
-                    let prev = rooms[rooms.len() - 1].center();
-                    if rng.gen_range(0, 2) == 1 {
-                        dig_horizontal(map, prev.x as i32, center.x as i32, prev.y as i32);
-                        dig_vertical(map, prev.y as i32, center.y as i32, center.x as i32);
-                    } else {
-                        dig_horizontal(map, prev.x as i32, center.x as i32, center.y as i32);
-                        dig_vertical(map, prev.y as i32, center.y as i32, prev.x as i32);
-                    }
+        for (y, ty) in (min_y..max_y).enumerate() {
+            for (x, tx) in (min_x..max_x).enumerate() {
+                if y < region.pos.y as usize || y > (region.pos.y + region.size.y) as usize || x < region.pos.x as usize || x > (region.pos.x + region.size.x) as usize {
+                    continue;
                 }
-                rooms.push(new_room);
+                let x = x - region.pos.x as usize;
+                let y = y - region.pos.y as usize;
+                if tx > 0 && tx < map_width && ty > 0 && ty < map_height {
+                    let tile = map.tiles.get((tx + ty * map_width) as usize).expect(&format!("Couldn't find {} {}", tx, ty));
+                    match tile {
+                        TileType::Wall => {
+                            ctx.draw(gfx,
+                                     &Glyph::from('#', Some(Color::GREEN), None),
+                                     (x as f32, y as f32));
+                        },
+                        TileType::Floor => {
+                            ctx.draw(gfx,
+                                     &Glyph::from('.',
+                                                  Some(Color::from_rgba(128, 128, 128, 1.0)),
+                                                  None),
+                                     (x as f32, y as f32));
+                        },
+                    }
+                } else {
+                    ctx.draw(gfx,
+                             &Glyph::from('-',
+                                          Some( Color::WHITE),
+                                          None),
+                             (x as f32, y as f32));
+                }
+
             }
-            let center = rooms[0].center();
-            (center.x as i32, center.y as i32)
         }
-    }
 
-    pub fn create_room(map: &mut Map, room: &Rectangle) {
-        let (x_start, y_start) = (room.pos.x as i32, room.pos.y as i32);
-        let (x_end, y_end) = ((room.pos.x + room.size.x) as i32, (room.pos.y + room.size.y) as i32);
-        for x in x_start..=x_end {
-            for y in y_start..=y_end {
-                let index = map.coord_to_index(x, y);
-                map.tiles[index] = TileType::Floor;
-                map.blocked[index] = false;
+        let positions = ecs.read_storage::<component::Position>();
+        let renderables = ecs.read_storage::<component::Renderable>();
+
+        for (pos, render) in (&positions, &renderables).join() {
+            let entity_screen_x = pos.x - min_x - region.pos.x as i32;
+            let entity_screen_y = pos.y - min_y - region.pos.y as i32;
+            if entity_screen_x > 0 && entity_screen_x < map_width && entity_screen_y > 0 && entity_screen_y < map_height {
+                ctx.draw(gfx, &render.glyph, (entity_screen_x as f32, entity_screen_y as f32));
             }
         }
     }
+    pub fn get_screen_bounds(ecs: &World, ctx: &TileContext) -> (i32, i32, i32, i32) {
+        let focus = ecs.fetch::<Focus>();
+        let (x_chars, y_chars) = ctx.grid.size;
 
-    pub fn dig_horizontal(map: &mut Map, start: i32, end: i32, y: i32) {
-        for x in min(start, end)..=max(start, end) {
-            let index = map.coord_to_index(x, y);
-            map.tiles[index] = TileType::Floor;
-            map.blocked[index] = false;
-        }
-    }
+        let center_x = (x_chars / 2);
+        let center_y = (y_chars/2);
 
-    pub fn dig_vertical(map: &mut Map, start: i32, end: i32, x: i32) {
-        for y in min(start, end)..=max(start, end) {
-            let index = map.coord_to_index(x, y);
-            map.tiles[index] = TileType::Floor;
-            map.blocked[index] = false;
-        }
+        let min_x = focus.x - center_x;
+        let max_x = min_x + x_chars;
+
+        let min_y = focus.y - center_y;
+        let max_y = min_y + y_chars;
+        (min_x, max_x, min_y, max_y)
     }
 }
 
@@ -184,6 +141,11 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
                 let mut log = ecs.write_resource::<GameLog>();
                 log.push(&format!("Walkin' along~"), Some(Color::GREEN), None);
             }
+            {
+                let mut focus = ecs.write_resource::<Focus>();
+                focus.x = desired_x;
+                focus.y = desired_y;
+            }
             pos.x = desired_x;
             pos.y = desired_y;
         }
@@ -202,16 +164,18 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
     }
 }
 
-pub fn handle_click(gs: &mut State, raw: (i32, i32), pos: (i32, i32)) {
+pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (i32, i32)) {
     {
+        let (min_x, max_x, min_y, max_y) = get_screen_bounds(&mut gs.ecs, ctx);
         let mut log = gs.ecs.write_resource::<GameLog>();
-
+        let pos = (pos.0 + min_x + region.pos.x as i32, pos.1 + min_y + region.pos.y as i32);
         let names = gs.ecs.read_storage::<Name>();
         let positions = gs.ecs.read_storage::<Position>();
-        println!("{:?}", pos);
+        println!("Clicked on {} {}", pos.0, pos.1);
         for (name, position) in (&names, &positions).join() {
-            println!("{:?} {:?} {}", name.name, position.x, position.y);
+            println!("Player on {} {}", position.x, position.y);
             if position.x == pos.0 && position.y == pos.1 {
+
                 log.push(&format!("You clicked on {}", name.name),
                         Some(Color::GREEN),
                         None);
@@ -269,7 +233,14 @@ impl GameLog {
     }
 }
 
+
+
 pub struct MouseState {
+    pub x: i32,
+    pub y: i32,
+}
+
+pub struct Focus {
     pub x: i32,
     pub y: i32,
 }
@@ -299,7 +270,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     gs.ecs.register::<component::Renderable>();
     gs.ecs.register::<component::Player>();
     gs.ecs.register::<component::Name>();
-
     gs.ecs
         .create_entity()
         .with(component::Position { x: position.0, y: position.1 })
@@ -322,7 +292,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         grid
     };
 
-
     let mut log = GameLog::with_length(5);
     log.push("Hello, world!", Some(Color::GREEN), None);
 
@@ -335,6 +304,14 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
 
     gs.ecs.insert(mouse);
 
+    let focus = Focus {
+        x: position.0,
+        y: position.1,
+    };
+
+    gs.ecs.insert(focus);
+
+    let map_region = Rectangle::new((0.0, 7), (80.0, 42));
     loop {
         while let Some(event) = events.next_event().await {
             match event {
@@ -349,7 +326,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     position
                 } => {
                     let scale = window.scale_factor();
-                    
+
                     let mut mouse = gs.ecs.write_resource::<MouseState>();
                     mouse.x = position.x as i32 / scale as i32;
                     mouse.y = position.y as i32 / scale as i32;
@@ -368,52 +345,27 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                             pos = tile_ctx.grid.point_to_grid(mouse.x as f32, mouse.y as f32);
                         }
 
-                        handle_click(&mut gs, raw, pos);
+                        handle_click(&mut gs, &tile_ctx, map_region, pos);
                     }
                 },
                 _ => (),
             }
         }
         gfx.clear(Color::BLACK);
-
-        let offset = 44;
-        let mut map = gs.ecs.fetch::<Map>();
-        for x in 0..map::MAPWIDTH {
-            for y in 0..map::MAPHEIGHT {
-                let tile = map.tiles.get(x + y * map::MAPWIDTH).unwrap();
-                match tile {
-                    TileType::Wall => {
-                        tile_ctx.draw(&mut gfx,
-                                      &Glyph::from('#', Some(Color::GREEN), None),
-                                      (x as f32, y as f32));
-                    },
-                    TileType::Floor => {
-                        tile_ctx.draw(&mut gfx,
-                                      &Glyph::from('.',
-                                                   Some(Color::from_rgba(128, 128, 128, 1.0)),
-                                                   None),
-                                      (x as f32, y as f32));
-                    },
-                }
+        draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
+        {
+            let log = gs.ecs.fetch::<GameLog>();
+            for (index, glyphs) in log.iter().enumerate() {
+                print_glyphs(&mut gfx, &tile_ctx, &glyphs, (1, (44 + index) as i32));
             }
         }
-
-
-
         let positions = gs.ecs.read_storage::<component::Position>();
-        let renderables = gs.ecs.read_storage::<component::Renderable>();
+        let players = gs.ecs.read_storage::<component::Player>();
 
-        for (pos, render) in (&positions, &renderables).join() {
-            tile_ctx.draw(&mut gfx, &render.glyph, (pos.x as f32, pos.y as f32));
+        for (_player, pos) in (&players, &positions).join() {
+            render_camera(&mut gfx, &gs.ecs, &tile_ctx, map_region);
+            break;
         }
-
-        draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
-        let log = gs.ecs.fetch::<GameLog>();
-        for (index, glyphs) in log.iter().enumerate() {
-            print_glyphs(&mut gfx, &tile_ctx, &glyphs, (1, (44 + index) as i32));
-        }
-
-
         gfx.present(&window)?;
     }
 }

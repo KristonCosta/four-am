@@ -4,7 +4,8 @@ use quicksilver::{
 
 pub struct Grid {
     width_multi: i32,
-    height_multi: i32
+    height_multi: i32,
+    pub size: (i32, i32),
 }
 
 impl Grid {
@@ -14,14 +15,17 @@ impl Grid {
         Grid {
             width_multi: (screen.x / grid.x) as i32,
             height_multi: (screen.y / grid.y) as i32,
+            size: (grid.x as i32, grid.y as i32),
         }
     }
 
-    pub fn from_tile_size(tile_size: impl Into<Vector>) -> Self {
+    pub fn from_tile_size(tile_size: impl Into<Vector>, screen_size: impl Into<Vector>) -> Self {
         let tile = tile_size.into();
+        let screen = screen_size.into();
         Grid {
             width_multi: tile.x as i32,
             height_multi: tile.y as i32,
+            size: ((screen.x / tile.x) as i32, (screen.y / tile.y) as i32)
         }
     }
 
