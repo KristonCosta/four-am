@@ -20,3 +20,8 @@ pub struct Player;
 pub struct Name {
     pub name: String
 }
+
+#[derive(Component)]
+pub struct PickableTile;
+
+

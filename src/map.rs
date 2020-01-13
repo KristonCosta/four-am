@@ -13,6 +13,30 @@ pub enum TileType {
     Floor,
 }
 
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TilePos(pub i32, pub i32);
+
+impl TilePos {
+    pub fn successors(&self, map: &Map) -> Vec<(TilePos, i32)> {
+        let (width, height) = map.size;
+        let mut succ = vec![];
+
+        if self.1 < height - 1 && !map.blocked[map.coord_to_index(self.0, self.1 + 1)] {
+            succ.push((TilePos(self.0, self.1 + 1), 1))
+        }
+        if self.1 > 0 && !map.blocked[map.coord_to_index( self.0, self.1 - 1)] {
+            succ.push((TilePos(self.0, self.1 - 1), 1))
+        }
+        if self.0 < width - 1 && !map.blocked[map.coord_to_index(self.0 + 1, self.1)] {
+            succ.push((TilePos(self.0 + 1, self.1), 1))
+        }
+        if self.0 > 0 && !map.blocked[map.coord_to_index( self.0 - 1, self.1)]{
+            succ.push((TilePos(self.0 - 1, self.1), 1))
+        }
+        succ
+    }
+}
+
 #[derive(Default)]
 pub struct Map {
     pub tiles: Vec<TileType>,
@@ -26,31 +50,33 @@ pub struct Map {
 
 // Base taken from https://bfnightly.bracketproductions.com/rustbook/chapter_23.html
 impl Map {
-    pub fn new(depth: i32) -> Self {
+    pub fn new(size: (i32, i32), depth: i32) -> Self {
+        let (width, height) = (size.0, size.1);
+        let total = (width * height) as usize;
         Map {
-            tiles: vec![TileType::Wall; MAPCOUNT],
-            size: (MAPWIDTH as i32, MAPHEIGHT as i32),
-            revealed_tiles: vec![false; MAPCOUNT],
-            visible_tiles: vec![false; MAPCOUNT],
-            blocked: vec![true; MAPCOUNT],
+            tiles: vec![TileType::Wall; total],
+            size: (width as i32, height as i32),
+            revealed_tiles: vec![false; total],
+            visible_tiles: vec![false; total],
+            blocked: vec![true; total],
             depth,
-            tile_content: vec![Vec::new(); MAPCOUNT],
+            tile_content: vec![Vec::new(); total],
         }
     }
     pub fn coord_to_index(&self, x: i32, y: i32) -> usize {
-        (y as usize * self.size.0 as usize) + x as usize
+        ((y as usize) * self.size.0 as usize) + x as usize
     }
 }
 
 pub(crate) trait MapBuilder {
-    fn build(depth: i32) -> (Map, (i32, i32)) ;
+    fn build(size: (i32, i32), depth: i32) -> (Map, (i32, i32)) ;
 }
 
 pub struct SimpleMapBuilder {}
 
 impl MapBuilder for SimpleMapBuilder {
-    fn build(depth: i32) -> (Map, (i32, i32)) {
-        let mut map = Map::new(depth);
+    fn build(size: (i32, i32), depth: i32) -> (Map, (i32, i32)) {
+        let mut map = Map::new(size, depth);
         let start_pos = SimpleMapBuilder::rooms_and_corridors(&mut map);
         (map, start_pos)
     }
@@ -68,8 +94,8 @@ impl SimpleMapBuilder {
         for i in 0..MAX_ROOMS {
             let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
             let h = rng.gen_range(MIN_SIZE, MAX_SIZE);
-            let x = rng.gen_range(1, map.size.0 - w - 1) - 1;
-            let y = rng.gen_range(1, map.size.1 - h - 1) - 1;
+            let x = rng.gen_range(1, map.size.0 - w - 1);
+            let y = rng.gen_range(1, map.size.1 - h - 1);
             let new_room = Rectangle::new((x, y), (w, h));
             create_room(map, &new_room);
             if !rooms.is_empty() {
@@ -93,8 +119,8 @@ impl SimpleMapBuilder {
 pub fn create_room(map: &mut Map, room: &Rectangle) {
     let (x_start, y_start) = (room.pos.x as i32, room.pos.y as i32);
     let (x_end, y_end) = ((room.pos.x + room.size.x) as i32, (room.pos.y + room.size.y) as i32);
-    for x in x_start..=x_end {
-        for y in y_start..=y_end {
+    for x in x_start..x_end {
+        for y in y_start..y_end {
             let index = map.coord_to_index(x, y);
             map.tiles[index] = TileType::Floor;
             map.blocked[index] = false;

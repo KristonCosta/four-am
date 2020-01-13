@@ -15,11 +15,12 @@ use crate::grid::Grid;
 use crate::tileset::Tileset;
 use crate::ui::{draw_box, print, print_glyphs};
 use std::slice::Iter;
-use crate::map::{SimpleMapBuilder, MapBuilder, Map, TileType};
+use crate::map::{SimpleMapBuilder, MapBuilder, Map, TileType, create_room, TilePos};
 use std::panic;
 use rand::Rng;
 use crate::component::{Position, Name};
 use crate::camera::{render_camera, get_screen_bounds};
+use pathfinding::prelude::dijkstra;
 
 pub mod font;
 pub mod tileset;
@@ -61,9 +62,9 @@ pub mod camera {
                 if y < region.pos.y as usize || y > (region.pos.y + region.size.y) as usize || x < region.pos.x as usize || x > (region.pos.x + region.size.x) as usize {
                     continue;
                 }
-                let x = x - region.pos.x as usize;
-                let y = y - region.pos.y as usize;
-                if tx > 0 && tx < map_width && ty > 0 && ty < map_height {
+                let x = x + region.pos.x as usize;
+                let y = y + region.pos.y as usize;
+                if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
                     let tile = map.tiles.get((tx + ty * map_width) as usize).expect(&format!("Couldn't find {} {}", tx, ty));
                     match tile {
                         TileType::Wall => {
@@ -92,12 +93,13 @@ pub mod camera {
 
         let positions = ecs.read_storage::<component::Position>();
         let renderables = ecs.read_storage::<component::Renderable>();
-
-        for (pos, render) in (&positions, &renderables).join() {
-            let entity_screen_x = pos.x - min_x - region.pos.x as i32;
-            let entity_screen_y = pos.y - min_y - region.pos.y as i32;
-            if entity_screen_x > 0 && entity_screen_x < map_width && entity_screen_y > 0 && entity_screen_y < map_height {
-                ctx.draw(gfx, &render.glyph, (entity_screen_x as f32, entity_screen_y as f32));
+        let mut data = (&positions, &renderables).join().collect::<Vec<_>>();
+        data.sort_by(|&a, &b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order) );
+        for (pos, render) in data.iter() {
+            let x = pos.x - min_x - region.pos.x as i32;
+            let y = pos.y - min_y - region.pos.y as i32;
+            if x >= region.pos.x as i32 && y >= region.pos.y as i32 && x < (region.pos.x + region.size.x) as i32 && y < (region.pos.y + region.size.y) as i32 {
+                ctx.draw(gfx, &render.glyph, (x as f32, y as f32));
             }
         }
     }
@@ -114,6 +116,46 @@ pub mod camera {
         let min_y = focus.y - center_y;
         let max_y = min_y + y_chars;
         (min_x, max_x, min_y, max_y)
+    }
+}
+
+pub fn clear_pickable(ecs: &mut World) {
+    let mut rm_entities = vec![];
+    {
+        let tiles = ecs.read_storage::<component::PickableTile>();
+        let entities = ecs.entities();
+        for (entity, tile) in (&entities, &tiles).join() {
+            rm_entities.push(entity);
+        }
+    }
+    for entity in rm_entities {
+        ecs.delete_entity(entity);
+    }
+}
+
+pub fn generate_pickable(ecs: &mut World, start: TilePos, end: TilePos) {
+    let mut result = None;
+    {
+        let map = ecs.fetch::<Map>();
+        result = dijkstra(&start, |p| p.successors(&map), |p| *p == end);
+    }
+    if let Some((p, _)) = result {
+        for pos in p {
+            let glyph = Glyph {
+                ch: '▒',
+                foreground: Some(Color::from_rgba(233, 212, 96, 0.5)),
+                background: None,
+                render_order: 1,
+            };
+            ecs
+                .create_entity()
+                .with(component::Position { x: pos.0, y: pos.1 })
+                .with(component::Renderable {
+                    glyph
+                })
+                .with(component::PickableTile)
+                .build();
+        }
     }
 }
 
@@ -166,16 +208,26 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
 
 pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (i32, i32)) {
     {
+        {
+            clear_pickable(&mut gs.ecs);
+        }
         let (min_x, max_x, min_y, max_y) = get_screen_bounds(&mut gs.ecs, ctx);
-        let mut log = gs.ecs.write_resource::<GameLog>();
         let pos = (pos.0 + min_x + region.pos.x as i32, pos.1 + min_y + region.pos.y as i32);
+
+        let start;
+        {
+            let focus = gs.ecs.fetch::<Focus>();
+            start = TilePos(focus.x, focus.y);
+        }
+        generate_pickable(&mut gs.ecs, start, TilePos(pos.0, pos.1));
+
+        let mut log = gs.ecs.write_resource::<GameLog>();
         let names = gs.ecs.read_storage::<Name>();
         let positions = gs.ecs.read_storage::<Position>();
         println!("Clicked on {} {}", pos.0, pos.1);
         for (name, position) in (&names, &positions).join() {
             println!("Player on {} {}", position.x, position.y);
             if position.x == pos.0 && position.y == pos.1 {
-
                 log.push(&format!("You clicked on {}", name.name),
                         Some(Color::GREEN),
                         None);
@@ -183,20 +235,6 @@ pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (
         }
     }
 
-}
-
-pub fn make_char(state: &mut State, ch: char, pos: (i32, i32)) {
-    state.ecs
-        .create_entity()
-        .with(component::Position { x: pos.0, y: pos.1 })
-        .with(component::Renderable {
-            glyph: Glyph {
-                ch: ch,
-                foreground: Some(Color::YELLOW),
-                background: None,
-            }
-        })
-        .build();
 }
 
 pub struct GameLog {
@@ -262,14 +300,16 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         ecs: World::new(),
     };
 
-    let (map, position) = SimpleMapBuilder::build(10);
-
+    let (map, position) = SimpleMapBuilder::build((80, 42), 10);
+    // let (mut map, position) = (Map::new((10,10), 10), (5,2));
+    // create_room(&mut map, &Rectangle::new((1, 1), (8, 8)));
     gs.ecs.insert(map);
 
     gs.ecs.register::<component::Position>();
     gs.ecs.register::<component::Renderable>();
     gs.ecs.register::<component::Player>();
     gs.ecs.register::<component::Name>();
+    gs.ecs.register::<component::PickableTile>();
     gs.ecs
         .create_entity()
         .with(component::Position { x: position.0, y: position.1 })
@@ -278,6 +318,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                 ch: '@',
                 foreground: Some(Color::YELLOW),
                 background: None,
+                render_order: 3
             }
         })
         .with(component::Player{})
@@ -310,8 +351,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     };
 
     gs.ecs.insert(focus);
-
-    let map_region = Rectangle::new((0.0, 7), (80.0, 42));
+    let map_region = Rectangle::new((0.0, 0.0), (80.0, 43));
     loop {
         while let Some(event) = events.next_event().await {
             match event {
