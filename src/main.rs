@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate specs_derive;
 use quicksilver::{
-    geom::{Vector, Rectangle},
     graphics::{Color, Graphics},
     lifecycle::{run, EventStream, Settings, Window, Event},
     Result,
@@ -23,6 +22,7 @@ use crate::camera::{render_camera, get_screen_bounds};
 use pathfinding::prelude::dijkstra;
 use std::time::{Instant, Duration};
 use pathfinding::directed::dijkstra::dijkstra_all;
+use crate::geom::{Point, Rect, Vector};
 
 pub mod font;
 pub mod tileset;
@@ -31,11 +31,63 @@ pub mod grid;
 pub mod ui;
 pub mod component;
 pub mod map;
+pub mod camera;
+
+pub mod geom {
+    use euclid::default::{
+        Rect as EuclidRect,
+        Point2D as EuclidPoint2D,
+        Vector2D as EuclidVector2D,
+        Size2D as EuclidSize2D,
+    };
+    use quicksilver::geom;
+
+    pub type Rect = EuclidRect<i32>;
+    pub type Point = EuclidPoint2D<i32>;
+    pub type Vector = EuclidVector2D<i32>;
+    pub type Size = EuclidSize2D<i32>;
+
+    pub trait To<T>: Sized {
+        fn to(self) -> T;
+    }
+
+    impl To<geom::Rectangle> for Rect {
+        fn to(self) -> geom::Rectangle {
+            geom::Rectangle::new(
+                geom::Vector::new(self.origin.x, self.origin.y),
+                geom::Vector::new(self.size.width, self.size.height))
+        }
+    }
+}
+
+pub mod error {
+    use rusttype::{Error as RTError};
+
+    pub type Result<T> = std::result::Result<T, Error>;
+    #[derive(Debug)]
+    pub enum Error {
+        Io(std::io::Error),
+        Font(RTError),
+    }
+
+    impl From<RTError> for Error {
+        fn from(other: RTError) -> Self {
+            Error::Font(other)
+        }
+    }
+
+    impl From<std::io::Error> for Error {
+        fn from(other: std::io::Error) -> Self {
+            Error::Io(other)
+        }
+    }
+
+}
 
 fn main() {
     run(
         Settings {
-            size: Vector::new(800.0, 600.0).into(),
+            size: quicksilver::geom::Vector::new(800.0, 600.0).into(),
             title: "Whoa",
             ..Settings::default()
         },
@@ -43,83 +95,8 @@ fn main() {
     );
 }
 
-pub mod camera {
-    use specs::{World, WorldExt};
-    use crate::{TileContext, component, Focus};
-    use crate::map::{Map, TileType};
-    use crate::glyph::Glyph;
-    use quicksilver::graphics::{Color, Graphics};
-    use specs::join::Join;
-    use quicksilver::geom::Rectangle;
 
-    // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
-    pub fn render_camera(gfx: &mut Graphics, ecs: &World, ctx: &TileContext, region: Rectangle) {
-        let map = ecs.fetch::<Map>();
 
-        let (min_x, max_x, min_y, max_y) = get_screen_bounds(ecs, ctx);
-        let (map_width, map_height) = map.size;
-
-        for (y, ty) in (min_y..max_y).enumerate() {
-            for (x, tx) in (min_x..max_x).enumerate() {
-                if y < region.pos.y as usize || y > (region.pos.y + region.size.y) as usize || x < region.pos.x as usize || x > (region.pos.x + region.size.x) as usize {
-                    continue;
-                }
-                let x = x + region.pos.x as usize;
-                let y = y + region.pos.y as usize;
-                if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
-                    let tile = map.tiles.get((tx + ty * map_width) as usize).expect(&format!("Couldn't find {} {}", tx, ty));
-                    match tile {
-                        TileType::Wall => {
-                            ctx.draw(gfx,
-                                     &Glyph::from('#', Some(Color::GREEN), None),
-                                     (x as f32, y as f32));
-                        },
-                        TileType::Floor => {
-                            ctx.draw(gfx,
-                                     &Glyph::from('.',
-                                                  Some(Color::from_rgba(128, 128, 128, 1.0)),
-                                                  None),
-                                     (x as f32, y as f32));
-                        },
-                    }
-                } else {
-                    ctx.draw(gfx,
-                             &Glyph::from('-',
-                                          Some( Color::WHITE),
-                                          None),
-                             (x as f32, y as f32));
-                }
-
-            }
-        }
-
-        let positions = ecs.read_storage::<component::Position>();
-        let renderables = ecs.read_storage::<component::Renderable>();
-        let mut data = (&positions, &renderables).join().collect::<Vec<_>>();
-        data.sort_by(|&a, &b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order) );
-        for (pos, render) in data.iter() {
-            let x = pos.x - min_x - region.pos.x as i32;
-            let y = pos.y - min_y - region.pos.y as i32;
-            if x >= region.pos.x as i32 && y >= region.pos.y as i32 && x < (region.pos.x + region.size.x) as i32 && y < (region.pos.y + region.size.y) as i32 {
-                ctx.draw(gfx, &render.glyph, (x as f32, y as f32));
-            }
-        }
-    }
-    pub fn get_screen_bounds(ecs: &World, ctx: &TileContext) -> (i32, i32, i32, i32) {
-        let focus = ecs.fetch::<Focus>();
-        let (x_chars, y_chars) = ctx.grid.size;
-
-        let center_x = (x_chars / 2);
-        let center_y = (y_chars/2);
-
-        let min_x = focus.x - center_x;
-        let max_x = min_x + x_chars;
-
-        let min_y = focus.y - center_y;
-        let max_y = min_y + y_chars;
-        (min_x, max_x, min_y, max_y)
-    }
-}
 
 pub fn clear_pickable(ecs: &mut World) {
     let mut rm_entities = vec![];
@@ -164,18 +141,19 @@ pub struct State {
     ecs: World
 }
 
-pub fn move_player(ecs: &mut World, desired_pos: (i32, i32)) {
+pub fn move_player(ecs: &mut World, desired_pos: impl Into<Point>) {
+    let desired_pos = desired_pos.into();
     let mut positions = ecs.write_storage::<component::Position>();
     let mut players = ecs.write_storage::<component::Player>();
 
     for (_player, pos) in (&mut players, &mut positions).join() {
         {
             let mut focus = ecs.write_resource::<Focus>();
-            focus.x = desired_pos.0;
-            focus.y = desired_pos.1;
+            focus.x = desired_pos.x;
+            focus.y = desired_pos.y;
         }
-        pos.x = desired_pos.0;
-        pos.y = desired_pos.1;
+        pos.x = desired_pos.x;
+        pos.y = desired_pos.y;
         break;
     }
 }
@@ -221,9 +199,10 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
     }
 }
 
-pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (i32, i32)) {
+pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rect, point: impl Into<Point>) {
+    let point = point.into();
     let (min_x, max_x, min_y, max_y) = get_screen_bounds(&gs.ecs, ctx);
-    let pos = (pos.0 + min_x + region.pos.x as i32, pos.1 + min_y + region.pos.y as i32);
+    let point: Point = (point.x + min_x + region.origin.x, point.y + min_y + region.origin.y).into();
     let mut was_teleported = false;
     let mut desired_pos = None;
     {
@@ -231,11 +210,8 @@ pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (
         let tiles = gs.ecs.read_storage::<component::PickableTile>();
 
         for (position, _tile) in (&positions, &tiles).join() {
-            println!("Checking {} {}", position.x, position.y);
-            if position.x == pos.0 && position.y == pos.1 {
-                println!("Teleporting to {} {}", pos.0, pos.1);
-                desired_pos = Some(pos);
-
+            if position.x == point.x && position.y == point.y {
+                desired_pos = Some(point);
                 break;
             }
         }
@@ -263,10 +239,8 @@ pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (
     let mut log = gs.ecs.write_resource::<GameLog>();
     let names = gs.ecs.read_storage::<Name>();
     let positions = gs.ecs.read_storage::<Position>();
-    println!("Clicked on {} {}", pos.0, pos.1);
     for (name, position) in (&names, &positions).join() {
-        println!("Player on {} {}", position.x, position.y);
-        if position.x == pos.0 && position.y == pos.1 {
+        if position.x == point.x && position.y == point.y {
             log.push(&format!("You clicked on {}", name.name),
                      Some(Color::GREEN),
                      None);
@@ -326,8 +300,8 @@ pub struct TileContext {
 }
 
 impl TileContext {
-    pub fn draw(&self, gfx: &mut Graphics, glyph: &Glyph, pos: (f32, f32)) {
-        let rect = self.grid.rect(pos.0, pos.1);
+    pub fn draw(&self, gfx: &mut Graphics, glyph: &Glyph, pos: impl Into<Point>) {
+        let rect = self.grid.rect(pos);
         self.tileset.draw(gfx, &glyph, rect);
     }
 }
@@ -362,8 +336,8 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         .with(component::Name{name: "Player".to_string() })
         .build();
 
-    let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0/8.0).await?;
-    let grid = grid::Grid::from_screen_size((80.0, 50.0), (800.0, 600.0));
+    let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0/8.0).await.expect("oof");
+    let grid = grid::Grid::from_screen_size((80, 50), (800, 600));
 
     let tile_ctx = TileContext {
         tileset,
@@ -388,7 +362,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     };
 
     gs.ecs.insert(focus);
-    let map_region = Rectangle::new((0.0, 0.0), (80.0, 42));
+    let map_region = Rect::new((0, 0).into(), (80, 42).into());
     let mut dirty = true;
     let mut duration = Duration::new(0, 0);
     loop {
@@ -417,12 +391,12 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     button,
                 } => {
                     if state == ElementState::Pressed {
-                        let mut pos = (0, 0);
-                        let mut raw = (0, 0);
+                        let pos;
+                        let raw;
                         {
                             let mut mouse = gs.ecs.fetch::<MouseState>();
                             raw = (mouse.x, mouse.y);
-                            pos = tile_ctx.grid.point_to_grid(mouse.x as f32, mouse.y as f32);
+                            pos = tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
                         }
 
                         handle_click(&mut gs, &tile_ctx, map_region, pos);
@@ -437,7 +411,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         }
         dirty = false;
         gfx.clear(Color::BLACK);
-        draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
+        draw_box(&mut gfx, &tile_ctx, Rect::new((0, 43).into(), (79, 6).into()), None, None);
         {
             let log = gs.ecs.fetch::<GameLog>();
             for (index, glyphs) in log.iter().enumerate() {

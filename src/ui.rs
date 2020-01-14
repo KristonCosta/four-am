@@ -1,5 +1,5 @@
-use quicksilver::geom::Rectangle;
 use quicksilver::graphics::{Color, Graphics};
+use crate::geom::{Rect, Point};
 use crate::grid::Grid;
 use crate::TileContext;
 use crate::glyph::Glyph;
@@ -7,7 +7,7 @@ use crate::glyph::Glyph;
 
 pub fn draw_box(gfx: &mut Graphics,
                 ctx: &TileContext,
-                rect: Rectangle,
+                rect: Rect,
                 fg: Option<Color>,
                 bg: Option<Color>) {
     let top_left = Glyph::from('╔', fg, bg);
@@ -17,40 +17,42 @@ pub fn draw_box(gfx: &mut Graphics,
     let vertical = Glyph::from('║', fg, bg);
     let horizontal = Glyph::from('═', fg, bg);
 
-    ctx.draw(gfx, &top_left, (rect.pos.x, rect.pos.y));
-    ctx.draw(gfx, &top_right, (rect.pos.x + rect.size.x, rect.pos.y));
-    ctx.draw(gfx, &bottom_left, (rect.pos.x, rect.pos.y + rect.size.y));
-    ctx.draw(gfx, &bottom_right, (rect.pos.x + rect.size.x, rect.pos.y + rect.size.y));
-    let (x_start, x_end) = (rect.pos.x as i32, (rect.pos.x + rect.size.x) as i32);
-    let (y_start, y_end) = (rect.pos.y as i32, (rect.pos.y + rect.size.y) as i32);
+    ctx.draw(gfx, &top_left, (rect.origin.x, rect.origin.y));
+    ctx.draw(gfx, &top_right, (rect.origin.x + rect.size.width, rect.origin.y));
+    ctx.draw(gfx, &bottom_left, (rect.origin.x, rect.origin.y + rect.size.height));
+    ctx.draw(gfx, &bottom_right, (rect.origin.x + rect.size.width, rect.origin.y + rect.size.height));
+    let (x_start, x_end) = (rect.origin.x, (rect.origin.x + rect.size.width));
+    let (y_start, y_end) = (rect.origin.y, (rect.origin.y + rect.size.height));
     for x in (x_start + 1)..x_end {
-        ctx.draw(gfx, &horizontal, (x as f32, y_start as f32));
-        ctx.draw(gfx, &horizontal, (x as f32, y_end as f32));
+        ctx.draw(gfx, &horizontal, (x, y_start));
+        ctx.draw(gfx, &horizontal, (x, y_end));
     }
     for y in (y_start + 1)..y_end {
-        ctx.draw(gfx, &vertical, (x_start as f32, y as f32));
-        ctx.draw(gfx, &vertical, (x_end as f32, y as f32));
+        ctx.draw(gfx, &vertical, (x_start, y));
+        ctx.draw(gfx, &vertical, (x_end, y));
     }
 }
 
 pub fn print(gfx: &mut Graphics,
              ctx: &TileContext,
              text: &str,
-             pos: (i32, i32),
+             pos: impl Into<Point>,
              fg: Option<Color>,
              bg: Option<Color>) {
+    let pos = pos.into();
     for (index, ch) in text.chars().enumerate() {
         let ch = Glyph::from(ch, fg, bg);
-        ctx.draw(gfx, &ch, (pos.0 as f32 + index as f32, pos.1 as f32));
+        ctx.draw(gfx, &ch, (pos.x + index as i32, pos.y));
     }
 }
 
 pub fn print_glyphs(gfx: &mut Graphics,
                     ctx: &TileContext,
                     glyphs: &Vec<Glyph>,
-                    pos: (i32, i32)) {
+                    pos: impl Into<Point>) {
+    let pos = pos.into();
     for (index, glyph) in glyphs.iter().enumerate() {
-        ctx.draw(gfx, &glyph, (pos.0 as f32 + index as f32, pos.1 as f32));
+        ctx.draw(gfx, &glyph, (pos.x + index as i32, pos.y));
     }
 }
 

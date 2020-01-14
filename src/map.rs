@@ -1,7 +1,7 @@
 use specs::Entity;
-use quicksilver::geom::{Rectangle, Shape};
 use std::cmp::{min, max};
 use rand::{Rng, SeedableRng};
+use crate::geom::Rect;
 
 pub const MAPWIDTH : usize = 80;
 pub const MAPHEIGHT : usize = 43;
@@ -103,35 +103,43 @@ impl SimpleMapBuilder {
         const MAX_ROOMS : i32 = 30;
         const MIN_SIZE : i32 = 6;
         const MAX_SIZE : i32 = 10;
-        let mut rooms: Vec<Rectangle> = vec![];
+        let mut rooms: Vec<Rect> = vec![];
         for i in 0..MAX_ROOMS {
             let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
             let h = rng.gen_range(MIN_SIZE, MAX_SIZE);
             let x = rng.gen_range(1, map.size.0 - w - 1);
             let y = rng.gen_range(1, map.size.1 - h - 1);
-            let new_room = Rectangle::new((x, y), (w, h));
-            create_room(map, &new_room);
-            if !rooms.is_empty() {
-                let center = new_room.center();
-                let prev = rooms[rooms.len() - 1].center();
-                if rng.gen_range(0, 2) == 1 {
-                    dig_horizontal(map, prev.x as i32, center.x as i32, prev.y as i32);
-                    dig_vertical(map, prev.y as i32, center.y as i32, center.x as i32);
-                } else {
-                    dig_horizontal(map, prev.x as i32, center.x as i32, center.y as i32);
-                    dig_vertical(map, prev.y as i32, center.y as i32, prev.x as i32);
-                }
+            let new_room = Rect::new((x, y).into(), (w, h).into());
+            let mut ok = true;
+            for other_room in rooms.iter() {
+                if new_room.intersects(other_room) {ok = false; break}
             }
-            rooms.push(new_room);
+
+            if ok {
+                create_room(map, &new_room);
+                if !rooms.is_empty() {
+                    let center = new_room.center();
+                    let prev = rooms[rooms.len() - 1].center();
+                    if rng.gen_range(0, 2) == 1 {
+                        dig_horizontal(map, prev.x as i32, center.x as i32, prev.y as i32);
+                        dig_vertical(map, prev.y as i32, center.y as i32, center.x as i32);
+                    } else {
+                        dig_horizontal(map, prev.x as i32, center.x as i32, center.y as i32);
+                        dig_vertical(map, prev.y as i32, center.y as i32, prev.x as i32);
+                    }
+                }
+                rooms.push(new_room);
+            }
+
         }
         let center = rooms[0].center();
         (center.x as i32, center.y as i32)
     }
 }
 
-pub fn create_room(map: &mut Map, room: &Rectangle) {
-    let (x_start, y_start) = (room.pos.x as i32, room.pos.y as i32);
-    let (x_end, y_end) = ((room.pos.x + room.size.x) as i32, (room.pos.y + room.size.y) as i32);
+pub fn create_room(map: &mut Map, room: &Rect) {
+    let (x_start, y_start) = room.origin.to_tuple();
+    let (x_end, y_end) = ((room.origin.x + room.size.width), (room.origin.y + room.size.height));
     for x in x_start..x_end {
         for y in y_start..y_end {
             let index = map.coord_to_index(x, y);

@@ -1,11 +1,13 @@
-use quicksilver::{
-    geom::{Rectangle, Vector}
+use crate::geom::{
+    Vector,
+    Rect,
+    Point,
 };
 
 pub struct Grid {
     width_multi: i32,
     height_multi: i32,
-    pub size: (i32, i32),
+    pub size: Vector,
 }
 
 impl Grid {
@@ -13,9 +15,9 @@ impl Grid {
         let grid = grid_size.into();
         let screen = screen_size.into();
         Grid {
-            width_multi: (screen.x / grid.x) as i32,
-            height_multi: (screen.y / grid.y) as i32,
-            size: (grid.x as i32, grid.y as i32),
+            width_multi: (screen.x / grid.x),
+            height_multi: (screen.y / grid.y),
+            size: (grid.x, grid.y).into(),
         }
     }
 
@@ -25,18 +27,20 @@ impl Grid {
         Grid {
             width_multi: tile.x as i32,
             height_multi: tile.y as i32,
-            size: ((screen.x / tile.x) as i32, (screen.y / tile.y) as i32)
+            size: (screen.x / tile.x, screen.y / tile.y).into()
         }
     }
 
-    pub fn rect(&self, x: f32, y: f32) -> Rectangle {
-        Rectangle::new(
-            (self.width_multi * x as i32, self.height_multi * y as i32),
-            (self.width_multi, self.height_multi)
+    pub fn rect(&self, point: impl Into<Point>) -> Rect {
+        let point = point.into();
+        Rect::new(
+            (self.width_multi * point.x, self.height_multi * point.y).into(),
+            (self.width_multi, self.height_multi).into(),
         )
     }
 
-    pub fn point_to_grid(&self, x: f32, y: f32) -> (i32, i32) {
-        ((x / self.width_multi as f32) as i32, (y / self.height_multi as f32) as i32)
+    pub fn point_to_grid(&self, point: impl Into<Point>) -> Point {
+        let point = point.into();
+        (point.x / self.width_multi, point.y / self.height_multi).into()
     }
 }
