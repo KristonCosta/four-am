@@ -21,6 +21,8 @@ use rand::Rng;
 use crate::component::{Position, Name};
 use crate::camera::{render_camera, get_screen_bounds};
 use pathfinding::prelude::dijkstra;
+use std::time::{Instant, Duration};
+use pathfinding::directed::dijkstra::dijkstra_all;
 
 pub mod font;
 pub mod tileset;
@@ -133,35 +135,49 @@ pub fn clear_pickable(ecs: &mut World) {
     }
 }
 
-pub fn generate_pickable(ecs: &mut World, start: TilePos, end: TilePos) {
-    let mut result = None;
+pub fn generate_pickable(ecs: &mut World, start: TilePos) {
+    let mut result;
     {
         let map = ecs.fetch::<Map>();
-        result = dijkstra(&start, |p| p.successors(&map), |p| *p == end);
+        result = dijkstra_all(&start, |p| p.successors(&map, 5));
     }
-    if let Some((p, _)) = result {
-        for pos in p {
-            let glyph = Glyph {
-                ch: '▒',
-                foreground: Some(Color::from_rgba(233, 212, 96, 0.5)),
-                background: None,
-                render_order: 1,
-            };
-            ecs
-                .create_entity()
-                .with(component::Position { x: pos.0, y: pos.1 })
-                .with(component::Renderable {
-                    glyph
-                })
-                .with(component::PickableTile)
-                .build();
-        }
+    for (pos,_) in result.iter() {
+        let glyph = Glyph {
+            ch: '▒',
+            foreground: Some(Color::from_rgba(233, 212, 96, 0.5)),
+            background: None,
+            render_order: 1,
+        };
+        ecs
+            .create_entity()
+            .with(component::Position { x: pos.0, y: pos.1 })
+            .with(component::Renderable {
+                glyph
+            })
+            .with(component::PickableTile)
+            .build();
     }
 }
 
 
 pub struct State {
     ecs: World
+}
+
+pub fn move_player(ecs: &mut World, desired_pos: (i32, i32)) {
+    let mut positions = ecs.write_storage::<component::Position>();
+    let mut players = ecs.write_storage::<component::Player>();
+
+    for (_player, pos) in (&mut players, &mut positions).join() {
+        {
+            let mut focus = ecs.write_resource::<Focus>();
+            focus.x = desired_pos.0;
+            focus.y = desired_pos.1;
+        }
+        pos.x = desired_pos.0;
+        pos.y = desired_pos.1;
+        break;
+    }
 }
 
 pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
@@ -189,8 +205,7 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
                 focus.y = desired_y;
             }
             pos.x = desired_x;
-            pos.y = desired_y;
-        }
+            pos.y = desired_y;        }
     }
 }
 
@@ -207,34 +222,56 @@ pub fn handle_key(gs: &mut State, key: Key, state: ElementState) {
 }
 
 pub fn handle_click(gs: &mut State, ctx: &TileContext, region: Rectangle, pos: (i32, i32)) {
+    let (min_x, max_x, min_y, max_y) = get_screen_bounds(&gs.ecs, ctx);
+    let pos = (pos.0 + min_x + region.pos.x as i32, pos.1 + min_y + region.pos.y as i32);
+    let mut was_teleported = false;
+    let mut desired_pos = None;
     {
-        {
-            clear_pickable(&mut gs.ecs);
-        }
-        let (min_x, max_x, min_y, max_y) = get_screen_bounds(&mut gs.ecs, ctx);
-        let pos = (pos.0 + min_x + region.pos.x as i32, pos.1 + min_y + region.pos.y as i32);
+        let positions = gs.ecs.read_storage::<component::Position>();
+        let tiles = gs.ecs.read_storage::<component::PickableTile>();
 
-        let start;
-        {
-            let focus = gs.ecs.fetch::<Focus>();
-            start = TilePos(focus.x, focus.y);
-        }
-        generate_pickable(&mut gs.ecs, start, TilePos(pos.0, pos.1));
-
-        let mut log = gs.ecs.write_resource::<GameLog>();
-        let names = gs.ecs.read_storage::<Name>();
-        let positions = gs.ecs.read_storage::<Position>();
-        println!("Clicked on {} {}", pos.0, pos.1);
-        for (name, position) in (&names, &positions).join() {
-            println!("Player on {} {}", position.x, position.y);
+        for (position, _tile) in (&positions, &tiles).join() {
+            println!("Checking {} {}", position.x, position.y);
             if position.x == pos.0 && position.y == pos.1 {
-                log.push(&format!("You clicked on {}", name.name),
-                        Some(Color::GREEN),
-                        None);
+                println!("Teleporting to {} {}", pos.0, pos.1);
+                desired_pos = Some(pos);
+
+                break;
             }
         }
     }
+    if let Some(desired_pos) = desired_pos {
+        move_player(&mut gs.ecs, desired_pos);
+        was_teleported = true;
+    }
 
+    {
+        clear_pickable(&mut gs.ecs);
+    }
+    if was_teleported {
+        return;
+    }
+
+
+    let start;
+    {
+        let focus = gs.ecs.fetch::<Focus>();
+        start = TilePos(focus.x, focus.y, 0);
+    }
+    generate_pickable(&mut gs.ecs, start);
+
+    let mut log = gs.ecs.write_resource::<GameLog>();
+    let names = gs.ecs.read_storage::<Name>();
+    let positions = gs.ecs.read_storage::<Position>();
+    println!("Clicked on {} {}", pos.0, pos.1);
+    for (name, position) in (&names, &positions).join() {
+        println!("Player on {} {}", position.x, position.y);
+        if position.x == pos.0 && position.y == pos.1 {
+            log.push(&format!("You clicked on {}", name.name),
+                     Some(Color::GREEN),
+                     None);
+        }
+    }
 }
 
 pub struct GameLog {
@@ -351,7 +388,9 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     };
 
     gs.ecs.insert(focus);
-    let map_region = Rectangle::new((0.0, 0.0), (80.0, 43));
+    let map_region = Rectangle::new((0.0, 0.0), (80.0, 42));
+    let mut dirty = true;
+    let mut duration = Duration::new(0, 0);
     loop {
         while let Some(event) = events.next_event().await {
             match event {
@@ -359,7 +398,8 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     key,
                     state
                 } => {
-                    handle_key(&mut gs, key, state)
+                    handle_key(&mut gs, key, state);
+                    dirty =true;
                 },
                 Event::MouseMoved {
                     pointer,
@@ -386,11 +426,16 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                         }
 
                         handle_click(&mut gs, &tile_ctx, map_region, pos);
+                        dirty =true;
                     }
                 },
                 _ => (),
             }
         }
+        if !dirty {
+            continue;
+        }
+        dirty = false;
         gfx.clear(Color::BLACK);
         draw_box(&mut gfx, &tile_ctx, Rectangle::new((0.0, 43.0), (79.0, 6.0)), None, None);
         {

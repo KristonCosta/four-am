@@ -14,24 +14,37 @@ pub enum TileType {
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TilePos(pub i32, pub i32);
+pub struct TilePos(pub i32, pub i32, pub i32);
 
 impl TilePos {
-    pub fn successors(&self, map: &Map) -> Vec<(TilePos, i32)> {
+    fn push_if_under_cost(&self,
+                          map: &Map,
+                          succ: &mut Vec<(TilePos, i32)>,
+                          offset: (i32, i32),
+                          max_cost: i32) {
+        if !map.blocked[map.coord_to_index(self.0 + offset.0, self.1 + offset.1)] {
+            let agg_cost = self.2 + 1;
+            if agg_cost <= max_cost {
+                succ.push((TilePos(self.0 + offset.0, self.1 + offset.1, agg_cost), 1));
+            }
+        }
+    }
+
+    pub fn successors(&self, map: &Map, max_cost: i32) -> Vec<(TilePos, i32)> {
         let (width, height) = map.size;
         let mut succ = vec![];
 
-        if self.1 < height - 1 && !map.blocked[map.coord_to_index(self.0, self.1 + 1)] {
-            succ.push((TilePos(self.0, self.1 + 1), 1))
+        if self.1 < height - 1 {
+            self.push_if_under_cost(map, &mut succ, (0, 1), max_cost)
         }
-        if self.1 > 0 && !map.blocked[map.coord_to_index( self.0, self.1 - 1)] {
-            succ.push((TilePos(self.0, self.1 - 1), 1))
+        if self.1 > 0 {
+            self.push_if_under_cost(map, &mut succ, (0, -1), max_cost)
         }
-        if self.0 < width - 1 && !map.blocked[map.coord_to_index(self.0 + 1, self.1)] {
-            succ.push((TilePos(self.0 + 1, self.1), 1))
+        if self.0 < width - 1 {
+            self.push_if_under_cost(map, &mut succ, (1, 0), max_cost)
         }
-        if self.0 > 0 && !map.blocked[map.coord_to_index( self.0 - 1, self.1)]{
-            succ.push((TilePos(self.0 - 1, self.1), 1))
+        if self.0 > 0 {
+            self.push_if_under_cost(map, &mut succ, (-1, 0), max_cost)
         }
         succ
     }
