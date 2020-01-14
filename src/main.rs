@@ -390,6 +390,14 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     state,
                     button,
                 } => {
+                    
+                    {
+                        let mut log = gs.ecs.write_resource::<GameLog>();
+                        log.push(&format!("State {:?} {:?}", state, button),
+                              Some(Color::GREEN),
+                              None);
+                    }
+    
                     if state == ElementState::Pressed {
                         let pos;
                         let raw;
