@@ -403,6 +403,19 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                         dirty =true;
                     }
                 },
+                Event::Touch {
+                    surface,
+                    phase,
+                    location,
+                    id
+                } => {
+                    {
+                        let mut log = gs.ecs.write_resource::<GameLog>();
+                        log.push(&format!("Touch event! {:?} {:?}", phase, location),
+                                 Some(Color::GREEN),
+                                 None);
+                    }
+                }
                 _ => (),
             }
         }

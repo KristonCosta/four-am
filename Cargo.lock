@@ -175,7 +175,7 @@ dependencies = [
 [[package]]
 name = "blinds"
 version = "0.1.0-alpha10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+source = "git+https://github.com/KristonCosta/blinds.git#5a30e317c3735473fcd8937858cd7d6ea7d730a7"
 dependencies = [
  "futures-executor 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-util 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1637,7 +1637,7 @@ name = "quicksilver"
 version = "0.4.0-alpha0"
 source = "git+https://github.com/ryanisaacg/quicksilver#ec31eb3f78dfdc0b207459f8542884966e77a788"
 dependencies = [
- "blinds 0.1.0-alpha10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "blinds 0.1.0-alpha10 (git+https://github.com/KristonCosta/blinds.git)",
  "bytemuck 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gestalt 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "golem 0.1.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2697,7 +2697,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bit-vec 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f59bbe95d4e52a6398ec21238d31577f2b28a9d86807f06ca59d191d8440d0bb"
 "checksum bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 "checksum blake2b_simd 0.5.10 (registry+https://github.com/rust-lang/crates.io-index)" = "d8fb2d74254a3a0b5cac33ac9f8ed0e44aa50378d9dbb2e5d83bd21ed1dc2c8a"
-"checksum blinds 0.1.0-alpha10 (registry+https://github.com/rust-lang/crates.io-index)" = "2c41cac85492434ebe20f9115a5b979343ccd3d6745be7b26342990bf3d97930"
+"checksum blinds 0.1.0-alpha10 (git+https://github.com/KristonCosta/blinds.git)" = "<none>"
 "checksum block 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 "checksum block-buffer 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c0940dc441f31689269e10ac70eb1002a3a1d3ad1390e030043662eb7fe4688b"
 "checksum block-padding 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "fa79dedbb091f449f1f39e53edf88d5dbe95f895dae6135a8d7b881fb5af73f5"
