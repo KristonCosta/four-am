@@ -464,7 +464,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             render_camera(&mut gfx, &gs.ecs, &tile_ctx, map_region);
             break;
         }
-        print(&mut gfx, &tile_ctx, "0.0.3", (0, 0), Some(Color::RED), Some(Color::BLACK));
+        print(&mut gfx, &tile_ctx, "0.0.4", (0, 0), Some(Color::RED), Some(Color::BLACK));
         gfx.present(&window)?;
     }
 }
