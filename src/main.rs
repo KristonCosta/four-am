@@ -393,7 +393,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     
                     {
                         let mut log = gs.ecs.write_resource::<GameLog>();
-                        log.push(&format!("State {:?} {:?}", state, button),
+                        log.push(&format!("State test {:?} {:?}", state, button),
                               Some(Color::GREEN),
                               None);
                     }
@@ -439,6 +439,8 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                 print_glyphs(&mut gfx, &tile_ctx, &glyphs, (1, (44 + index) as i32));
             }
         }
+
+
         let positions = gs.ecs.read_storage::<component::Position>();
         let players = gs.ecs.read_storage::<component::Player>();
 
@@ -446,6 +448,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             render_camera(&mut gfx, &gs.ecs, &tile_ctx, map_region);
             break;
         }
+        print(&mut gfx, &tile_ctx, "0.0.1", (0, 0), Some(Color::RED), Some(Color::BLACK));
         gfx.present(&window)?;
     }
 }
