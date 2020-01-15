@@ -27,5 +27,5 @@ branch = "master"
 features = ["saving", "stdweb"]
 
 [patch.crates-io]
-winit = { git = 'https://github.com/rust-windowing/winit.git', branch = 'master', features = ['stdweb'] }
+winit = { git = 'https://github.com/KristonCosta/winit.git', branch = 'master', features = ['stdweb'] }
 blinds = { git = 'https://github.com/KristonCosta/blinds.git', branch = 'master', features = ['stdweb'] }

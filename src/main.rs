@@ -390,13 +390,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     state,
                     button,
                 } => {
-                    
-                    {
-                        let mut log = gs.ecs.write_resource::<GameLog>();
-                        log.push(&format!("State test {:?} {:?}", state, button),
-                              Some(Color::GREEN),
-                              None);
-                    }
     
                     if state == ElementState::Pressed {
                         let pos;
@@ -407,7 +400,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                             pos = tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
                         }
 
-                        handle_click(&mut gs, &tile_ctx, map_region, pos);
+                       // handle_click(&mut gs, &tile_ctx, map_region, pos);
                         dirty =true;
                     }
                 },
@@ -418,10 +411,33 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
                     id
                 } => {
                     {
-                        let mut log = gs.ecs.write_resource::<GameLog>();
-                        log.push(&format!("Touch event! {:?} {:?}", phase, location),
-                                 Some(Color::GREEN),
-                                 None);
+                        {
+                            let mut log = gs.ecs.write_resource::<GameLog>();
+                            log.push(&format!("Touch event! {:?} {:?}", phase, location),
+                                     Some(Color::GREEN),
+                                     None);
+                        }
+                        let scale = window.scale_factor();
+                        {
+                            let mut mouse = gs.ecs.write_resource::<MouseState>();
+                            mouse.x = location.x as i32 / scale as i32;
+                            mouse.y = location.y as i32 / scale as i32;
+                        }
+                        let pos;
+                        let raw;
+                        {
+                            let mut mouse = gs.ecs.fetch::<MouseState>();
+                            raw = (mouse.x, mouse.y);
+                            pos = tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
+                        }
+                        {
+                            let mut log = gs.ecs.write_resource::<GameLog>();
+                            log.push(&format!("Moving to {:?}", pos),
+                                     Some(Color::GREEN),
+                                     None);
+                        }
+                        handle_click(&mut gs, &tile_ctx, map_region, pos);
+                        dirty =true;
                     }
                 }
                 _ => (),
@@ -448,7 +464,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             render_camera(&mut gfx, &gs.ecs, &tile_ctx, map_region);
             break;
         }
-        print(&mut gfx, &tile_ctx, "0.0.1", (0, 0), Some(Color::RED), Some(Color::BLACK));
+        print(&mut gfx, &tile_ctx, "0.0.3", (0, 0), Some(Color::RED), Some(Color::BLACK));
         gfx.present(&window)?;
     }
 }
