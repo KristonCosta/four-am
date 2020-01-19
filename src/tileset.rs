@@ -1,11 +1,9 @@
-use std::collections::HashMap;
-use quicksilver::{
-    graphics::{Image, Graphics},
-};
+use crate::error::Result;
 use crate::font::Font;
+use crate::geom::{Rect, To, Vector};
 use crate::glyph::Glyph;
-use crate::geom::{Rect, Vector, To};
-use crate::error::{Result};
+use quicksilver::graphics::{Graphics, Image};
+use std::collections::HashMap;
 
 pub struct Tileset {
     image: Image,
@@ -23,10 +21,7 @@ impl Tileset {
     pub async fn from_font(gfx: &Graphics, path: &str, ratio: f32) -> Result<Tileset> {
         let font = Font::load(path).await?;
         let size = 40;
-        let (font_image, mut width_vec) = font.render(&gfx,
-                                                      SUPPORTED_CHARS,
-                                                      size,
-                                                      ratio)?;
+        let (font_image, mut width_vec) = font.render(&gfx, SUPPORTED_CHARS, size, ratio)?;
         let mut map = HashMap::new();
         width_vec.reverse();
         for glyphs in SUPPORTED_CHARS.lines() {
@@ -34,12 +29,10 @@ impl Tileset {
                 map.insert(glyph, width_vec.pop().unwrap());
             }
         }
-        Ok(
-            Tileset {
-                image: font_image,
-                map,
-            }
-        )
+        Ok(Tileset {
+            image: font_image,
+            map,
+        })
     }
     pub fn draw(&self, gfx: &mut Graphics, glyph: &Glyph, region: Rect) {
         let image = &self.image;
@@ -48,7 +41,7 @@ impl Tileset {
             gfx.fill_rect(&region, *background);
         }
         if glyph.ch == ' ' {
-            return
+            return;
         }
         let rect = self.map.get(&glyph.ch).unwrap();
         if let Some(foreground) = &glyph.foreground {

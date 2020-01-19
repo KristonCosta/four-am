@@ -1,8 +1,4 @@
-use crate::geom::{
-    Vector,
-    Rect,
-    Point,
-};
+use crate::geom::{Point, Rect, Vector};
 
 pub struct Grid {
     width_multi: i32,
@@ -27,7 +23,7 @@ impl Grid {
         Grid {
             width_multi: tile.x as i32,
             height_multi: tile.y as i32,
-            size: (screen.x / tile.x, screen.y / tile.y).into()
+            size: (screen.x / tile.x, screen.y / tile.y).into(),
         }
     }
 

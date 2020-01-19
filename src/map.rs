@@ -1,11 +1,11 @@
-use specs::Entity;
-use std::cmp::{min, max};
-use rand::{Rng, SeedableRng};
 use crate::geom::Rect;
+use rand::{Rng, SeedableRng};
+use specs::Entity;
+use std::cmp::{max, min};
 
-pub const MAPWIDTH : usize = 80;
-pub const MAPHEIGHT : usize = 43;
-pub const MAPCOUNT : usize = MAPHEIGHT * MAPWIDTH;
+pub const MAPWIDTH: usize = 80;
+pub const MAPHEIGHT: usize = 43;
+pub const MAPCOUNT: usize = MAPHEIGHT * MAPWIDTH;
 
 #[derive(Clone)]
 pub enum TileType {
@@ -17,11 +17,13 @@ pub enum TileType {
 pub struct TilePos(pub i32, pub i32, pub i32);
 
 impl TilePos {
-    fn push_if_under_cost(&self,
-                          map: &Map,
-                          succ: &mut Vec<(TilePos, i32)>,
-                          offset: (i32, i32),
-                          max_cost: i32) {
+    fn push_if_under_cost(
+        &self,
+        map: &Map,
+        succ: &mut Vec<(TilePos, i32)>,
+        offset: (i32, i32),
+        max_cost: i32,
+    ) {
         if !map.blocked[map.coord_to_index(self.0 + offset.0, self.1 + offset.1)] {
             let agg_cost = self.2 + 1;
             if agg_cost <= max_cost {
@@ -58,7 +60,7 @@ pub struct Map {
     pub visible_tiles: Vec<bool>,
     pub blocked: Vec<bool>,
     pub depth: i32,
-    pub tile_content: Vec<Vec<Entity>>
+    pub tile_content: Vec<Vec<Entity>>,
 }
 
 // Base taken from https://bfnightly.bracketproductions.com/rustbook/chapter_23.html
@@ -82,7 +84,20 @@ impl Map {
 }
 
 pub(crate) trait MapBuilder {
-    fn build(size: (i32, i32), depth: i32) -> (Map, (i32, i32)) ;
+    fn build(size: (i32, i32), depth: i32) -> (Map, (i32, i32));
+}
+
+pub struct RoomMapBuilder {}
+
+impl MapBuilder for RoomMapBuilder {
+    fn build(size: (i32, i32), depth: i32) -> (Map, (i32, i32)) {
+        let mut map = Map::new(size, depth);
+        create_room(
+            &mut map,
+            &Rect::new((1, 1).into(), (size.0 - 2, size.1 - 2).into()),
+        );
+        (map, (size.0 / 2, size.1 / 2))
+    }
 }
 
 pub struct SimpleMapBuilder {}
@@ -93,16 +108,15 @@ impl MapBuilder for SimpleMapBuilder {
         let start_pos = SimpleMapBuilder::rooms_and_corridors(&mut map);
         (map, start_pos)
     }
-
 }
 
 impl SimpleMapBuilder {
     pub fn rooms_and_corridors(map: &mut Map) -> (i32, i32) {
         let mut rng = rand::thread_rng();
 
-        const MAX_ROOMS : i32 = 30;
-        const MIN_SIZE : i32 = 6;
-        const MAX_SIZE : i32 = 10;
+        const MAX_ROOMS: i32 = 30;
+        const MIN_SIZE: i32 = 6;
+        const MAX_SIZE: i32 = 10;
         let mut rooms: Vec<Rect> = vec![];
         for i in 0..MAX_ROOMS {
             let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
@@ -112,7 +126,10 @@ impl SimpleMapBuilder {
             let new_room = Rect::new((x, y).into(), (w, h).into());
             let mut ok = true;
             for other_room in rooms.iter() {
-                if new_room.intersects(other_room) {ok = false; break}
+                if new_room.intersects(other_room) {
+                    ok = false;
+                    break;
+                }
             }
 
             if ok {
@@ -130,7 +147,6 @@ impl SimpleMapBuilder {
                 }
                 rooms.push(new_room);
             }
-
         }
         let center = rooms[0].center();
         (center.x as i32, center.y as i32)
@@ -139,7 +155,10 @@ impl SimpleMapBuilder {
 
 pub fn create_room(map: &mut Map, room: &Rect) {
     let (x_start, y_start) = room.origin.to_tuple();
-    let (x_end, y_end) = ((room.origin.x + room.size.width), (room.origin.y + room.size.height));
+    let (x_end, y_end) = (
+        (room.origin.x + room.size.width),
+        (room.origin.y + room.size.height),
+    );
     for x in x_start..x_end {
         for y in y_start..y_end {
             let index = map.coord_to_index(x, y);
