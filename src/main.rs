@@ -25,7 +25,7 @@ use specs::{Builder, World, WorldExt};
 use std::cmp::{max, min};
 use std::panic;
 use std::slice::Iter;
-use std::time::{Duration, Instant};
+use instant::Instant;
 use crate::gamestate::{handle_event, RunState, GameState};
 
 pub mod gamestate;
@@ -50,13 +50,59 @@ fn main() {
         Settings {
             size: quicksilver::geom::Vector::new(800.0, 600.0).into(),
             title: "Whoa",
-            vsync: false,
+            vsync: true,
             ..Settings::default()
         },
         app,
     );
 }
 
+type FP = f32;
+const MS_PER_UPDATE: FP = 0.1;
+
+#[derive(Debug)]
+pub struct TimeStep {
+    last_time:   Instant,
+    delta_time:  FP,
+    frame_count: u32,
+    frame_time:  FP,
+}
+
+impl TimeStep {
+    pub fn new() -> TimeStep {
+        TimeStep {
+            last_time:   Instant::now(),
+            delta_time:  0.0,
+            frame_count: 0,
+            frame_time:  0.0,
+        }
+    }
+
+    pub fn delta(&mut self) -> FP {
+        let current_time = Instant::now();
+        let delta = current_time.duration_since(self.last_time).as_micros()
+            as FP
+            * 0.001;
+        self.last_time = current_time;
+        self.delta_time = delta;
+        delta
+    }
+
+    // provides the framerate in FPS
+    pub fn frame_rate(&mut self) -> Option<u32> {
+        self.frame_count += 1;
+        self.frame_time += self.delta_time;
+        let tmp;
+        // per second
+        if self.frame_time >= 1000.0 {
+            tmp = self.frame_count;
+            self.frame_count = 0;
+            self.frame_time = 0.0;
+            return Some(tmp);
+        }
+        None
+    }
+}
 
 
 
@@ -157,10 +203,12 @@ fn generate_centipede(ecs: &mut World, i :u32) {
 }
 
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
+    let x = 160;
+    let y = 100;
     let mut ecs = World::new();
     register_components(&mut ecs);
     register_resources(&mut ecs);
-    let (map, position) = RoomMapBuilder::build((80, 42), 10);
+    let (map, position) = RoomMapBuilder::build((x, y - 20), 10);
     ecs.insert(map);
     let focus = Focus {
         x: position.0,
@@ -168,7 +216,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     };
     ecs.insert(focus);
 
-    for i in 1..100 {
+    for i in 1..1000 {
         generate_centipede(&mut ecs, i);
     }
 
@@ -193,46 +241,57 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             visible_tiles: vec![],
             range: 8,
         })
-        .with(component::Priority {
-            value: 1,
-        })
         .build();
 
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
         .await
         .expect("oof");
-    let grid = grid::Grid::from_screen_size((80, 50), (800, 600));
+    let grid = grid::Grid::from_screen_size((x, y), (800, 600));
 
     let tile_ctx = TileContext { tileset, grid };
-    let map_region = Rect::new((0, 0).into(), (80, 42).into());
+    let map_region = Rect::new((0, 0).into(), (x, y - 8).into());
     let mut gs = GameState {
         ecs,
         runstate: RunState::Running,
         tile_ctx,
         map_region
     };
-
+    let mut timestep = TimeStep::new();
+    let mut lag: f32 = 0.0;
+    let mut turns = 0;
     loop {
-        let mut ms = ai::MonsterAi;
-        let mut ts = turn_system::TurnSystem;
-        ms.run_now(&gs.ecs);
-        ts.run_now(&gs.ecs);
-        gs.ecs.maintain();
         while let Some(event) = events.next_event().await {
             handle_event(&window, &mut gs, event);
+        }
+        let mut ms = ai::MonsterAi;
+        let mut ts = turn_system::TurnSystem;
+
+        lag += timestep.delta();
+        while lag >= MS_PER_UPDATE {
+            turns += 1;
+            ms.run_now(&gs.ecs);
+            ts.run_now(&gs.ecs);
+            gs.ecs.maintain();
+            lag -= MS_PER_UPDATE;
+
+        }
+        if let Some(fps) = timestep.frame_rate() {
+            println!("FPS {}", fps);
+            println!("TPS {}", turns);
+            turns = 0;
         }
         gfx.clear(Color::BLACK);
         draw_box(
             &mut gfx,
             &gs.tile_ctx,
-            Rect::new((0, 43).into(), (79, 6).into()),
+            Rect::new((0, y - 7).into(), (x - 1, 6).into()),
             None,
             None,
         );
         {
             let log = gs.ecs.fetch::<GameLog>();
             for (index, glyphs) in log.iter().enumerate() {
-                print_glyphs(&mut gfx, &gs.tile_ctx, &glyphs, (1, (44 + index) as i32));
+                print_glyphs(&mut gfx, &gs.tile_ctx, &glyphs, (1, (y - 6 + index as i32) as i32));
             }
         }
 

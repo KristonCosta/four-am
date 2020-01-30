@@ -43,7 +43,7 @@ impl Tileset {
         if glyph.ch == ' ' {
             return;
         }
-        let rect = self.map.get(&glyph.ch).unwrap();
+        let rect = self.map[&glyph.ch];
         if let Some(foreground) = &glyph.foreground {
             gfx.draw_subimage_tinted(image, rect.to(), region, *foreground);
         } else {
@@ -53,7 +53,7 @@ impl Tileset {
 
     pub fn draw_char(&self, gfx: &mut Graphics, glyph: char, region: Rect) {
         let image = &self.image;
-        let rect = self.map.get(&glyph).unwrap();
+        let rect = self.map[&glyph];
         gfx.draw_subimage(image, rect.to(), region.to());
     }
 }

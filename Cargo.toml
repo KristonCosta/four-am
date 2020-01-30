@@ -11,6 +11,7 @@ walkdir = "2.2.9"
 
 [dependencies]
 rusttype = "0.8.2"
+instant = { version = "0.1.2", features = ["stdweb"]}
 image = "0.23.0-preview.0"
 pathfinding = "2.0.3"
 specs-derive = "0.4.0"

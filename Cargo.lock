@@ -677,6 +677,7 @@ version = "0.1.0"
 dependencies = [
  "euclid 0.20.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.23.0-preview.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "instant 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "pathfinding 2.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "quicksilver 0.4.0-alpha0 (git+https://github.com/ryanisaacg/quicksilver)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
