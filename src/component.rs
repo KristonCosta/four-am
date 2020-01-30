@@ -31,8 +31,24 @@ pub struct FieldOfView {
     pub range: i32,
 }
 
+pub enum TurnState {
+    PENDING,
+    ACTIVE,
+    DONE
+}
+
+#[derive(Component)]
+pub struct ActiveTurn {
+    pub state: TurnState
+}
+
 #[derive(Component)]
 pub struct Monster;
+
+#[derive(Component)]
+pub struct Priority {
+    pub value: u8
+}
 
 pub fn register_components(ecs: &mut World) {
     ecs.register::<Position>();
@@ -41,4 +57,7 @@ pub fn register_components(ecs: &mut World) {
     ecs.register::<Name>();
     ecs.register::<PickableTile>();
     ecs.register::<FieldOfView>();
+    ecs.register::<Monster>();
+    ecs.register::<ActiveTurn>();
+    ecs.register::<Priority>();
 }
