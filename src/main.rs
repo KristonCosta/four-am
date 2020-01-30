@@ -42,12 +42,15 @@ pub mod fov;
 pub mod geom;
 pub mod color;
 pub mod error;
+pub mod ai;
+pub mod turn_system;
 
 fn main() {
     run(
         Settings {
             size: quicksilver::geom::Vector::new(800.0, 600.0).into(),
             title: "Whoa",
+            vsync: false,
             ..Settings::default()
         },
         app,
@@ -113,145 +116,27 @@ impl TileContext {
     }
 }
 
-pub mod ai {
-    use crate::component::{
-        ActiveTurn,
-        Monster,
-        TurnState,
-        Name,
-        Position,
-    };
-    use specs::prelude::*;
-    use std::cmp::{min, max};
-    use quicksilver::graphics::Color;
-    use rand::Rng;
+fn register_resources(ecs: &mut World) {
+    let mut log = GameLog::with_length(5);
+    log.push("Hello, world!", Some(Color::GREEN), None);
 
-    pub struct MonsterAi;
+    let mouse = MouseState { x: 0, y: 0 };
 
-    impl<'a> System<'a> for MonsterAi {
-        type SystemData = (
-            ReadExpect<'a, crate::map::Map>,
-            WriteExpect<'a, crate::GameLog>,
-            ReadStorage<'a, Monster>,
-            WriteStorage<'a, ActiveTurn>,
-            WriteStorage<'a, Position>,
-            ReadStorage<'a, Name>,
-        );
-
-        fn run(&mut self, data: Self::SystemData) {
-            let (mut map,
-                 mut log,
-                 monsters,
-                 mut turns,
-                 mut positions,
-                 names,) = data;
-
-            for (monster, mut turn, mut pos, name) in (&monsters, &mut turns, &mut positions, &names).join() {
-                let mut rng = rand::thread_rng();
-                let delta_x = rng.gen_range(-1, 2);
-                let delta_y = rng.gen_range(-1, 2);
-                let desired_x = min(map.size.0, max(0, pos.x + delta_x));
-                let desired_y = min(map.size.1, max(0, pos.y + delta_y));
-
-                if map.blocked[map.coord_to_index(desired_x, desired_y)] {
-                    log.push(&format!("Da {} hit a wall!", name.name), Some(Color::RED), None);
-                } else {
-                    pos.x = desired_x;
-                    pos.y = desired_y;
-                    turn.state = TurnState::DONE;
-
-                }
-            }
-        }
-    }
-}
-
-pub mod turn_system {
-
-    use crate::component::{
-        ActiveTurn,
-        Priority,
-        TurnState,
-    };
-    use specs::prelude::*;
-
-    pub struct PendingMoves {
-        list: Vec<Entity>
-    }
-    
-    impl PendingMoves {
-        pub fn new() -> Self {
-            Self {
-                list: vec![]
-            }
-        }
-    }
-
-    pub struct TurnSystem;
-
-    impl<'a> System<'a> for TurnSystem {
-        type SystemData = (
-            Entities<'a>,
-            WriteExpect<'a, crate::GameLog>,
-            WriteExpect<'a, PendingMoves>,
-            ReadStorage<'a, Priority>,
-            WriteStorage<'a, ActiveTurn>,
-        );
-
-        fn run(&mut self, data: Self::SystemData) {
-            let (entities,
-                mut log,
-                mut pending_moves,
-                priorities,
-                mut active) = data;
-
-            let mut finished = vec![];
-            let mut active_entity = false;
-            for (entity, mut turn) in (&entities, &mut active).join() {
-                active_entity = true;
-                match turn.state {
-                    TurnState::DONE => finished.push(entity.clone()),
-                    _ => (),
-                }
-            }
-
-            if finished.is_empty() && active_entity {
-                return
-            }
-
-            for entity in finished {
-                active.remove(entity);
-            }
-
-            if pending_moves.list.is_empty() {
-                let mut priority_tuple = vec![];
-                for (entity, priority) in (&entities, &priorities).join() {
-                    priority_tuple.push((priority.value, entity));
-                }
-                priority_tuple.sort_by_key(|k| k.0);
-                pending_moves.list = priority_tuple.iter().map(|v| v.1).collect();
-            }
-
-            let next_turn = pending_moves.list.pop().expect("No entites could take a turn");
-            active.insert(next_turn, ActiveTurn{
-                state: TurnState::PENDING
-            });
-        }
-    }
+    let turn = turn_system::PendingMoves::new();
+    ecs.insert(turn);
+    ecs.insert(log);
+    ecs.insert(mouse);
 
 }
 
-async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
-    let mut ecs = World::new();
-    register_components(&mut ecs);
-
-    let (map, position) = RoomMapBuilder::build((80, 42), 10);
-    ecs.insert(map);
-
+fn generate_centipede(ecs: &mut World, i :u32) {
+    let mut rng = rand::thread_rng();
+    let position_x = rng.gen_range(10, 70);
+    let position_y = rng.gen_range(10, 30);
     ecs.create_entity()
         .with(component::Position {
-            x: position.0,
-            y: position.1 + 15,
+            x: position_x,
+            y: position_y,
         })
         .with(component::Renderable {
             glyph: Glyph {
@@ -262,13 +147,30 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             },
         })
         .with(component::Name {
-            name: "Giant Centipede".to_string(),
+            name: format!("Giant Centipede {}", i),
         })
         .with(component::Priority {
             value: 1,
         })
         .with(component::Monster)
         .build();
+}
+
+async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
+    let mut ecs = World::new();
+    register_components(&mut ecs);
+    register_resources(&mut ecs);
+    let (map, position) = RoomMapBuilder::build((80, 42), 10);
+    ecs.insert(map);
+    let focus = Focus {
+        x: position.0,
+        y: position.1,
+    };
+    ecs.insert(focus);
+
+    for i in 1..100 {
+        generate_centipede(&mut ecs, i);
+    }
 
     ecs.create_entity()
         .with(component::Position {
@@ -302,22 +204,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let grid = grid::Grid::from_screen_size((80, 50), (800, 600));
 
     let tile_ctx = TileContext { tileset, grid };
-
-    let mut log = GameLog::with_length(5);
-    log.push("Hello, world!", Some(Color::GREEN), None);
-
-    let mouse = MouseState { x: 0, y: 0 };
-
-    let focus = Focus {
-        x: position.0,
-        y: position.1,
-    };
-
-    let turn = turn_system::PendingMoves::new();
-    ecs.insert(turn);
-    ecs.insert(log);
-    ecs.insert(mouse);
-    ecs.insert(focus);
     let map_region = Rect::new((0, 0).into(), (80, 42).into());
     let mut gs = GameState {
         ecs,
@@ -325,7 +211,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         tile_ctx,
         map_region
     };
-    let mut duration = Duration::new(0, 0);
 
     loop {
         let mut ms = ai::MonsterAi;
