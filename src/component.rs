@@ -3,13 +3,13 @@ use crate::glyph;
 use quicksilver::graphics::Color;
 use specs::prelude::*;
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Renderable {
     pub glyph: glyph::Glyph,
 }
@@ -46,6 +46,12 @@ pub struct ActiveTurn {
 pub struct Monster;
 
 #[derive(Component)]
+pub struct TileBlocker;
+
+#[derive(Component)]
+pub struct Killed;
+
+#[derive(Component)]
 pub struct Priority {
     pub value: u8
 }
@@ -60,4 +66,6 @@ pub fn register_components(ecs: &mut World) {
     ecs.register::<Monster>();
     ecs.register::<ActiveTurn>();
     ecs.register::<Priority>();
+    ecs.register::<TileBlocker>();
+    ecs.register::<Killed>();
 }

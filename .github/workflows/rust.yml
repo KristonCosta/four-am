@@ -47,7 +47,8 @@ jobs:
         uses: actions-rs/cargo@v1 
         with:
           command: web
-          args: deploy
+          args: deploy, --release
+
       - name: Deploy
         if: github.ref == 'refs/heads/master'
         uses: peaceiris/actions-gh-pages@v2

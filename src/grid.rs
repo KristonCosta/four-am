@@ -1,8 +1,8 @@
 use crate::geom::{Point, Rect, Vector};
 
 pub struct Grid {
-    width_multi: i32,
-    height_multi: i32,
+    pub width_multi: i32,
+    pub height_multi: i32,
     pub size: Vector,
 }
 

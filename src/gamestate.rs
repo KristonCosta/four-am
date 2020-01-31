@@ -1,6 +1,6 @@
 use specs::prelude::*;
 use crate::{GameLog, Focus, component, TileContext, MouseState};
-use crate::component::{Name, Position, TurnState};
+use crate::component::{Name, Position, TurnState, Killed};
 use specs::{World, WorldExt, Builder};
 use std::cmp::{min, max};
 use crate::map::{Map, TilePos};
@@ -136,20 +136,29 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
     let mut positions = ecs.write_storage::<component::Position>();
     let mut players = ecs.write_storage::<component::Player>();
     let mut active = ecs.write_storage::<component::ActiveTurn>();
+    let mut killed = ecs.write_storage::<component::Killed>();
+    let names = ecs.read_storage::<component::Name>();
     for (_player, pos, turn) in (&mut players, &mut positions, &mut active).join() {
-        let desired_x = min(79, max(0, pos.x + delta_x));
-        let desired_y = min(49, max(0, pos.y + delta_y));
-
         let map = ecs.fetch::<Map>();
-        if map.blocked[map.coord_to_index(desired_x, desired_y)] {
+        let desired_x = min(map.size.0, max(0, pos.x + delta_x));
+        let desired_y = min(map.size.1, max(0, pos.y + delta_y));
+
+        let coord = map.coord_to_index(desired_x, desired_y);
+        if map.blocked[coord] {
             {
                 let mut log = ecs.write_resource::<GameLog>();
                 log.push(&format!("Ouch, you hit a wall!"), Some(Color::RED), None);
             }
-        } else {
+        } else if let Some(entity) = map.tile_content[coord] {
             {
                 let mut log = ecs.write_resource::<GameLog>();
+                let name = names.get(entity);
+                if let Some(name) = name {
+                    log.push(&format!("Ouch, you killed {}", name.name), Some(Color::RED), None);
+                }
+                killed.insert(entity, Killed);
             }
+        } else {
             {
                 let mut focus = ecs.write_resource::<Focus>();
                 focus.x = desired_x;

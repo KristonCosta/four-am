@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate specs_derive;
 use crate::camera::{get_screen_bounds, render_camera};
-use crate::component::{register_components, Name, Position};
+use crate::component::{register_components, Name, Position, Killed};
 use crate::geom::{Point, Rect, Vector};
 use crate::glyph::Glyph;
 use crate::grid::Grid;
@@ -58,7 +58,7 @@ fn main() {
 }
 
 type FP = f32;
-const MS_PER_UPDATE: FP = 0.1;
+const MS_PER_UPDATE: FP = 1.0;
 
 #[derive(Debug)]
 pub struct TimeStep {
@@ -69,6 +69,8 @@ pub struct TimeStep {
 }
 
 impl TimeStep {
+    // https://gitlab.com/flukejones/diir-doom/blob/master/game/src/main.rs
+    // Grabbed this from here
     pub fn new() -> TimeStep {
         TimeStep {
             last_time:   Instant::now(),
@@ -177,8 +179,8 @@ fn register_resources(ecs: &mut World) {
 
 fn generate_centipede(ecs: &mut World, i :u32) {
     let mut rng = rand::thread_rng();
-    let position_x = rng.gen_range(10, 70);
-    let position_y = rng.gen_range(10, 30);
+    let position_x = rng.gen_range(10, 50);
+    let position_y = rng.gen_range(10, 20);
     ecs.create_entity()
         .with(component::Position {
             x: position_x,
@@ -198,17 +200,52 @@ fn generate_centipede(ecs: &mut World, i :u32) {
         .with(component::Priority {
             value: 1,
         })
+        .with(component::TileBlocker)
         .with(component::Monster)
         .build();
 }
 
+pub fn generate_blood(ecs: &mut World, pos: Vector) {
+    ecs.create_entity()
+        .with(component::Position {
+            x: pos.x,
+            y: pos.y,
+        })
+        .with(component::Renderable {
+            glyph: Glyph {
+                ch: '%',
+                foreground: Some(color::RED),
+                background: None,
+                render_order: 100
+            }
+        })
+        .build();
+}
+
+pub fn sweep(ecs: &mut World) {
+    let mut killed = vec![];
+    {
+        let combat_stats = ecs.read_storage::<Killed>();
+        let positions = ecs.read_storage::<Position>();
+        let entities = ecs.entities();
+        for (entity, stats, position) in (&entities, &combat_stats, &positions).join() {
+            killed.push((entity, (position.x, position.y)));
+        }
+    }
+
+    for (entity, position) in killed {
+        ecs.delete_entity(entity);
+        generate_blood(ecs, (position.0, position.1).into());
+    }
+}
+
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
-    let x = 160;
-    let y = 100;
+    let x = 80;
+    let y = 50;
     let mut ecs = World::new();
     register_components(&mut ecs);
     register_resources(&mut ecs);
-    let (map, position) = RoomMapBuilder::build((x, y - 20), 10);
+    let (map, position) = RoomMapBuilder::build((60, 30), 10);
     ecs.insert(map);
     let focus = Focus {
         x: position.0,
@@ -216,7 +253,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     };
     ecs.insert(focus);
 
-    for i in 1..1000 {
+    for i in 1..100 {
         generate_centipede(&mut ecs, i);
     }
 
@@ -237,10 +274,10 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         .with(component::Name {
             name: "Player".to_string(),
         })
-        .with(component::FieldOfView {
-            visible_tiles: vec![],
-            range: 8,
+        .with(component::Priority{
+            value: 100
         })
+        .with(component::TileBlocker)
         .build();
 
     let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
@@ -265,12 +302,14 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
         }
         let mut ms = ai::MonsterAi;
         let mut ts = turn_system::TurnSystem;
-
+        let mut indexer = map::MapIndexer;
         lag += timestep.delta();
         while lag >= MS_PER_UPDATE {
             turns += 1;
+            indexer.run_now(&gs.ecs);
             ms.run_now(&gs.ecs);
             ts.run_now(&gs.ecs);
+            sweep(&mut gs.ecs);
             gs.ecs.maintain();
             lag -= MS_PER_UPDATE;
 

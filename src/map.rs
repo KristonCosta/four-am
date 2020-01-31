@@ -1,13 +1,10 @@
 use crate::geom::Rect;
 use rand::{Rng, SeedableRng};
-use specs::Entity;
+use specs::prelude::*;
 use std::cmp::{max, min};
+use crate::component::{Position, TileBlocker};
 
-pub const MAPWIDTH: usize = 80;
-pub const MAPHEIGHT: usize = 43;
-pub const MAPCOUNT: usize = MAPHEIGHT * MAPWIDTH;
-
-#[derive(Clone)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TileType {
     Wall,
     Floor,
@@ -60,7 +57,7 @@ pub struct Map {
     pub visible_tiles: Vec<bool>,
     pub blocked: Vec<bool>,
     pub depth: i32,
-    pub tile_content: Vec<Vec<Entity>>,
+    pub tile_content: Vec<Option<Entity>>,
 }
 
 // Base taken from https://bfnightly.bracketproductions.com/rustbook/chapter_23.html
@@ -75,11 +72,21 @@ impl Map {
             visible_tiles: vec![false; total],
             blocked: vec![true; total],
             depth,
-            tile_content: vec![Vec::new(); total],
+            tile_content: vec![None; total],
         }
     }
     pub fn coord_to_index(&self, x: i32, y: i32) -> usize {
         ((y as usize) * self.size.0 as usize) + x as usize
+    }
+    pub fn refresh_blocked(&mut self) {
+        for (i, tile) in self.tiles.iter_mut().enumerate() {
+            self.blocked[i] = *tile == TileType::Wall;
+        }
+    }
+    pub fn refresh_content(&mut self) {
+        for i in 0..self.tile_content.len() {
+            self.tile_content[i] = None
+        }
     }
 }
 
@@ -181,5 +188,26 @@ pub fn dig_vertical(map: &mut Map, start: i32, end: i32, x: i32) {
         let index = map.coord_to_index(x, y);
         map.tiles[index] = TileType::Floor;
         map.blocked[index] = false;
+    }
+}
+
+pub struct MapIndexer;
+
+impl<'a> System<'a> for MapIndexer {
+    type SystemData = (
+        Entities<'a>,
+        WriteExpect<'a, Map>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, TileBlocker>
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (entities, mut map, positions, blocks) = data;
+        map.refresh_blocked();
+        map.refresh_content();
+        for (entity, position, _) in (&entities, &positions, &blocks).join() {
+            let index = map.coord_to_index(position.x, position.y);
+            map.tile_content[index] = Some(entity.clone());
+        }
     }
 }
