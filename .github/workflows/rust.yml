@@ -47,7 +47,7 @@ jobs:
         uses: actions-rs/cargo@v1 
         with:
           command: web
-          args: deploy, --release
+          args: deploy --release
 
       - name: Deploy
         if: github.ref == 'refs/heads/master'
