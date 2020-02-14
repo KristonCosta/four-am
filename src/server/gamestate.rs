@@ -1,20 +1,19 @@
-use specs::prelude::*;
-use crate::{GameLog, Focus, component, TileContext, MouseState};
-use crate::component::{Name, Position, TurnState, Killed};
 use specs::{World, WorldExt, Builder};
-use std::cmp::{min, max};
-use crate::map::{Map, TilePos};
-use quicksilver::graphics::Color;
-use pathfinding::prelude::dijkstra_all;
-use crate::glyph::Glyph;
-use quicksilver::lifecycle::{ElementState, Key, Event, Window};
 use crate::geom::{Rect, Point};
-use crate::camera::get_screen_bounds;
+use crate::component;
+use quicksilver::graphics::Color;
+use crate::client::glyph::Glyph;
+use crate::server::map::{Map, TilePos};
+use std::cmp::{max, min};
+use pathfinding::prelude::dijkstra_all;
+use crate::resources::log::GameLog;
+use crate::component::{Killed, TurnState};
+use crate::client::client::Focus;
+use specs::join::Join;
 
 pub struct GameState {
     pub(crate) ecs: World,
     pub(crate) runstate: RunState,
-    pub(crate) tile_ctx: TileContext,
     pub(crate) map_region: Rect,
 }
 
@@ -25,70 +24,6 @@ pub enum RunState {
     Running,
 }
 
-pub fn handle_key(gs: &mut GameState, key: Key, state: ElementState) {
-    if state == ElementState::Pressed {
-        match key {
-            Key::W => try_move_player(0, -1, &mut gs.ecs),
-            Key::A => try_move_player(-1, 0, &mut gs.ecs),
-            Key::S => try_move_player(0, 1, &mut gs.ecs),
-            Key::D => try_move_player(1, 0, &mut gs.ecs),
-            _ => {}
-        }
-    }
-}
-
-pub fn handle_click(gs: &mut GameState, point: impl Into<Point>) {
-    let point = point.into();
-    let GameState {
-        ecs,
-        runstate: _,
-        tile_ctx,
-        map_region,
-    } = gs;
-    let (min_x, _max_x, min_y, _max_y) = get_screen_bounds(&ecs, &tile_ctx);
-    let point: Point = (
-        point.x + min_x + map_region.origin.x,
-        point.y + min_y + map_region.origin.y,
-    )
-        .into();
-    let mut was_teleported = false;
-    let mut desired_pos = None;
-    {
-        let positions = ecs.read_storage::<component::Position>();
-        let tiles = ecs.read_storage::<component::PickableTile>();
-
-        for (position, _tile) in (&positions, &tiles).join() {
-            if position.x == point.x && position.y == point.y {
-                desired_pos = Some(point);
-                break;
-            }
-        }
-    }
-    if let Some(desired_pos) = desired_pos {
-        move_player(ecs, desired_pos);
-        was_teleported = true;
-    }
-
-    {
-        clear_pickable(ecs);
-    }
-    if was_teleported {
-        return;
-    }
-
-    let mut log = ecs.write_resource::<GameLog>();
-    let names = ecs.read_storage::<Name>();
-    let positions = ecs.read_storage::<Position>();
-    for (name, position) in (&names, &positions).join() {
-        if position.x == point.x && position.y == point.y {
-            log.push(
-                &format!("You clicked on {}", name.name),
-                Some(Color::GREEN),
-                None,
-            );
-        }
-    }
-}
 
 pub fn clear_pickable(ecs: &mut World) {
     let mut rm_entities = vec![];
@@ -179,39 +114,5 @@ pub fn move_player(ecs: &mut World, desired_pos: impl Into<Point>) {
         pos.y = desired_pos.y;
         active.state = TurnState::DONE;
         break;
-    }
-}
-
-pub fn handle_event(window: &Window, gs: &mut GameState, event: Event) -> bool {
-    match event {
-        Event::KeyboardInput { key, state } => {
-            handle_key(gs, key, state);
-            true
-        }
-        Event::MouseMoved { pointer: _, position } => {
-            let scale = window.scale_factor();
-
-            let mut mouse = gs.ecs.write_resource::<MouseState>();
-            mouse.x = position.x as i32 / scale as i32;
-            mouse.y = position.y as i32 / scale as i32;
-            false
-        }
-        Event::MouseInput {
-            pointer: _,
-            state,
-            button: _,
-        } => {
-            if state == ElementState::Pressed {
-                let pos;
-                {
-                    let mouse = gs.ecs.fetch::<MouseState>();
-                    pos = gs.tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
-                }
-
-                handle_click(gs,pos);
-            }
-            state == ElementState::Pressed
-        }
-        _ => false,
     }
 }

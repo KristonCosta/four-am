@@ -3,13 +3,14 @@ use specs::prelude::*;
 use std::cmp::{min, max};
 use quicksilver::graphics::Color;
 use rand::Rng;
+use crate::resources::log::GameLog;
 
 pub struct MonsterAi;
 
 impl<'a> System<'a> for MonsterAi {
     type SystemData = (
-        ReadExpect<'a, crate::map::Map>,
-        WriteExpect<'a, crate::GameLog>,
+        ReadExpect<'a, crate::server::map::Map>,
+        WriteExpect<'a, GameLog>,
         ReadStorage<'a, Monster>,
         WriteStorage<'a, ActiveTurn>,
         WriteStorage<'a, Position>,

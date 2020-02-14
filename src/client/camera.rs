@@ -1,18 +1,17 @@
-use crate::glyph::Glyph;
-use crate::map::{Map, TileType};
-use crate::{component, Focus, GameState, TileContext};
-use quicksilver::graphics::{Color, Graphics};
-use specs::join::Join;
 use specs::{World, WorldExt};
+use crate::client::client::{TileContext, Focus};
+use quicksilver::graphics::{Graphics, Color};
+use crate::client::glyph::Glyph;
+use crate::server::map::{TileType, Map};
+use crate::component;
+use crate::geom::Rect;
+use specs::join::Join;
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
 pub fn render_camera(
-    GameState {
-        ecs,
-        runstate: _,
-        tile_ctx,
-        map_region,
-    }: &GameState,
+    ecs: &World,
+    map_region: &Rect,
+    tile_ctx: &TileContext,
     gfx: &mut Graphics,
 ) {
     let map = ecs.fetch::<Map>();

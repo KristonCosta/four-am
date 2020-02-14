@@ -1,5 +1,5 @@
 use crate::geom;
-use crate::glyph;
+use crate::client::glyph;
 use specs::prelude::*;
 
 #[derive(Component, Debug)]

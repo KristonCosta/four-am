@@ -4,6 +4,7 @@ use crate::component::{
     TurnState,
 };
 use specs::prelude::*;
+use crate::resources::log::GameLog;
 
 pub struct PendingMoves {
     list: Vec<Entity>
@@ -22,7 +23,7 @@ pub struct TurnSystem;
 impl<'a> System<'a> for TurnSystem {
     type SystemData = (
         Entities<'a>,
-        WriteExpect<'a, crate::GameLog>,
+        WriteExpect<'a, GameLog>,
         WriteExpect<'a, PendingMoves>,
         ReadStorage<'a, Priority>,
         WriteStorage<'a, ActiveTurn>,

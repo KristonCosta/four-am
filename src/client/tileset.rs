@@ -1,7 +1,7 @@
 use crate::error::Result;
-use crate::font::Font;
+use crate::client::font::Font;
 use crate::geom::{Rect, To};
-use crate::glyph::Glyph;
+use crate::client::glyph::Glyph;
 use quicksilver::graphics::{Graphics, Image};
 use std::collections::HashMap;
 

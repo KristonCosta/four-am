@@ -1,7 +1,7 @@
 use crate::geom::{Point, Rect};
-use crate::glyph::Glyph;
-use crate::TileContext;
+use crate::client::glyph::Glyph;
 use quicksilver::graphics::{Color, Graphics};
+use crate::client::client::TileContext;
 
 pub fn draw_box(
     gfx: &mut Graphics,
