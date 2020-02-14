@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::font::Font;
-use crate::geom::{Rect, To, Vector};
+use crate::geom::{Rect, To};
 use crate::glyph::Glyph;
 use quicksilver::graphics::{Graphics, Image};
 use std::collections::HashMap;

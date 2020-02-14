@@ -1,5 +1,5 @@
 use crate::error::Result;
-use crate::geom::{Point, Rect, Size, Vector};
+use crate::geom::{Point, Rect, Size};
 use quicksilver::graphics::{Graphics, Image, PixelFormat};
 use quicksilver::load_file;
 use rusttype::{point, Font as RTFont, PositionedGlyph, Scale};

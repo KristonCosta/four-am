@@ -41,11 +41,11 @@ pub fn handle_click(gs: &mut GameState, point: impl Into<Point>) {
     let point = point.into();
     let GameState {
         ecs,
-        runstate,
+        runstate: _,
         tile_ctx,
         map_region,
     } = gs;
-    let (min_x, max_x, min_y, max_y) = get_screen_bounds(&ecs, &tile_ctx);
+    let (min_x, _max_x, min_y, _max_y) = get_screen_bounds(&ecs, &tile_ctx);
     let point: Point = (
         point.x + min_x + map_region.origin.x,
         point.y + min_y + map_region.origin.y,
@@ -76,13 +76,6 @@ pub fn handle_click(gs: &mut GameState, point: impl Into<Point>) {
         return;
     }
 
-    let start;
-    {
-        let focus = ecs.fetch::<Focus>();
-        start = TilePos(focus.x, focus.y, 0);
-    }
-    // generate_pickable(&mut gs.ecs, start);
-
     let mut log = ecs.write_resource::<GameLog>();
     let names = ecs.read_storage::<Name>();
     let positions = ecs.read_storage::<Position>();
@@ -102,7 +95,7 @@ pub fn clear_pickable(ecs: &mut World) {
     {
         let tiles = ecs.read_storage::<component::PickableTile>();
         let entities = ecs.entities();
-        for (entity, tile) in (&entities, &tiles).join() {
+        for (entity, _tile) in (&entities, &tiles).join() {
             rm_entities.push(entity);
         }
     }
@@ -112,7 +105,7 @@ pub fn clear_pickable(ecs: &mut World) {
 }
 
 pub fn generate_pickable(ecs: &mut World, start: TilePos) {
-    let mut result;
+    let result;
     {
         let map = ecs.fetch::<Map>();
         result = dijkstra_all(&start, |p| p.successors(&map, 5));
@@ -156,7 +149,7 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
                 if let Some(name) = name {
                     log.push(&format!("Ouch, you killed {}", name.name), Some(Color::RED), None);
                 }
-                killed.insert(entity, Killed);
+                killed.insert(entity, Killed).expect("failed to insert killed");
             }
         } else {
             {
@@ -195,7 +188,7 @@ pub fn handle_event(window: &Window, gs: &mut GameState, event: Event) -> bool {
             handle_key(gs, key, state);
             true
         }
-        Event::MouseMoved { pointer, position } => {
+        Event::MouseMoved { pointer: _, position } => {
             let scale = window.scale_factor();
 
             let mut mouse = gs.ecs.write_resource::<MouseState>();
@@ -204,16 +197,14 @@ pub fn handle_event(window: &Window, gs: &mut GameState, event: Event) -> bool {
             false
         }
         Event::MouseInput {
-            pointer,
+            pointer: _,
             state,
-            button,
+            button: _,
         } => {
             if state == ElementState::Pressed {
                 let pos;
-                let raw;
                 {
-                    let mut mouse = gs.ecs.fetch::<MouseState>();
-                    raw = (mouse.x, mouse.y);
+                    let mouse = gs.ecs.fetch::<MouseState>();
                     pos = gs.tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
                 }
 

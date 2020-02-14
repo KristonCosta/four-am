@@ -1,4 +1,3 @@
-use crate::geom::Rect;
 use crate::glyph::Glyph;
 use crate::map::{Map, TileType};
 use crate::{component, Focus, GameState, TileContext};
@@ -10,7 +9,7 @@ use specs::{World, WorldExt};
 pub fn render_camera(
     GameState {
         ecs,
-        runstate,
+        runstate: _,
         tile_ctx,
         map_region,
     }: &GameState,
@@ -78,8 +77,8 @@ pub fn get_screen_bounds(ecs: &World, ctx: &TileContext) -> (i32, i32, i32, i32)
     let focus = ecs.fetch::<Focus>();
     let (x_chars, y_chars) = ctx.grid.size.to_tuple();
 
-    let center_x = (x_chars / 2);
-    let center_y = (y_chars / 2);
+    let center_x = x_chars / 2;
+    let center_y = y_chars / 2;
 
     let min_x = focus.x - center_x;
     let max_x = min_x + x_chars;

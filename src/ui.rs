@@ -1,6 +1,5 @@
 use crate::geom::{Point, Rect};
 use crate::glyph::Glyph;
-use crate::grid::Grid;
 use crate::TileContext;
 use quicksilver::graphics::{Color, Graphics};
 

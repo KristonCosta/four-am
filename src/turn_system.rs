@@ -30,14 +30,14 @@ impl<'a> System<'a> for TurnSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (entities,
-            mut log,
+            _log,
             mut pending_moves,
             priorities,
             mut active) = data;
 
         let mut finished = vec![];
         let mut active_entity = false;
-        for (entity, mut turn) in (&entities, &mut active).join() {
+        for (entity, turn) in (&entities, &mut active).join() {
             active_entity = true;
             match turn.state {
                 TurnState::DONE => finished.push(entity.clone()),

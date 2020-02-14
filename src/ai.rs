@@ -18,7 +18,7 @@ impl<'a> System<'a> for MonsterAi {
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (mut map,
+        let (map,
              mut log,
              monsters,
              mut turns,
@@ -26,7 +26,7 @@ impl<'a> System<'a> for MonsterAi {
              names,
              mut killed) = data;
         let mut to_kill = vec![];
-        for (monster, mut turn, mut pos, name) in (&monsters, &mut turns, &mut positions, &names).join() {
+        for (_monster, mut turn, mut pos, name) in (&monsters, &mut turns, &mut positions, &names).join() {
             let mut rng = rand::thread_rng();
             let delta_x = rng.gen_range(-1, 2);
             let delta_y = rng.gen_range(-1, 2);
@@ -52,7 +52,7 @@ impl<'a> System<'a> for MonsterAi {
             }
         }
         for entity in to_kill.drain(..) {
-            killed.insert(entity, Killed);
+            killed.insert(entity, Killed).expect("failed to insert killed");
         }
     }
 }

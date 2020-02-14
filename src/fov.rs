@@ -24,7 +24,7 @@ fn calculate_fov_for_direction(
 ) {
     let mut ox = (pos.0 as f32) + 0.5;
     let mut oy = (pos.1 as f32) + 0.5;
-    for i in 0..radius {
+    for _i in 0..radius {
         set.insert((ox as i32, oy as i32));
         let coords = map.coord_to_index(ox as i32, oy as i32);
         if map.blocked[coords] {

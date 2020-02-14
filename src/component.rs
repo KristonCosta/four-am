@@ -1,6 +1,5 @@
 use crate::geom;
 use crate::glyph;
-use quicksilver::graphics::Color;
 use specs::prelude::*;
 
 #[derive(Component, Debug)]

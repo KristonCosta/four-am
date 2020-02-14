@@ -1,5 +1,5 @@
 use crate::geom::Rect;
-use rand::{Rng, SeedableRng};
+use rand::{Rng};
 use specs::prelude::*;
 use std::cmp::{max, min};
 use crate::component::{Position, TileBlocker};
@@ -125,7 +125,7 @@ impl SimpleMapBuilder {
         const MIN_SIZE: i32 = 6;
         const MAX_SIZE: i32 = 10;
         let mut rooms: Vec<Rect> = vec![];
-        for i in 0..MAX_ROOMS {
+        for _i in 0..MAX_ROOMS {
             let w = rng.gen_range(MIN_SIZE, MAX_SIZE);
             let h = rng.gen_range(MIN_SIZE, MAX_SIZE);
             let x = rng.gen_range(1, map.size.0 - w - 1);

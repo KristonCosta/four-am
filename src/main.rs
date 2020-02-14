@@ -1,29 +1,24 @@
 #[macro_use]
 extern crate specs_derive;
-use crate::camera::{get_screen_bounds, render_camera};
-use crate::component::{register_components, Name, Position, Killed};
+use crate::camera::render_camera;
+use crate::component::{register_components, Position, Killed};
 use crate::geom::{Point, Rect, Vector};
 use crate::glyph::Glyph;
 use crate::grid::Grid;
 use crate::map::{
-    create_room, Map, MapBuilder, RoomMapBuilder, SimpleMapBuilder, TilePos, TileType,
+    MapBuilder, RoomMapBuilder
 };
 use crate::tileset::Tileset;
-use crate::ui::{draw_box, print, print_glyphs};
-use pathfinding::directed::dijkstra::dijkstra_all;
-use pathfinding::prelude::dijkstra;
+use crate::ui::{draw_box, print_glyphs};
 use quicksilver::graphics::Color;
-use quicksilver::lifecycle::{ElementState, Key};
 use quicksilver::{
     graphics::Graphics,
-    lifecycle::{run, Event, EventStream, Settings, Window},
+    lifecycle::{run, EventStream, Settings, Window},
     Result,
 };
 use rand::Rng;
 use specs::prelude::*;
 use specs::{Builder, World, WorldExt};
-use std::cmp::{max, min};
-use std::panic;
 use std::slice::Iter;
 use instant::Instant;
 use crate::gamestate::{handle_event, RunState, GameState};
@@ -58,7 +53,7 @@ fn main() {
 }
 
 type FP = f32;
-const MS_PER_UPDATE: FP = 1.0;
+const MS_PER_UPDATE: FP = 0.1;
 
 #[derive(Debug)]
 pub struct TimeStep {
@@ -228,18 +223,19 @@ pub fn sweep(ecs: &mut World) {
         let combat_stats = ecs.read_storage::<Killed>();
         let positions = ecs.read_storage::<Position>();
         let entities = ecs.entities();
-        for (entity, stats, position) in (&entities, &combat_stats, &positions).join() {
+        for (entity, _stats, position) in (&entities, &combat_stats, &positions).join() {
             killed.push((entity, (position.x, position.y)));
         }
     }
 
     for (entity, position) in killed {
-        ecs.delete_entity(entity);
+        ecs.delete_entity(entity).expect("Failed to delete entity");
         generate_blood(ecs, (position.0, position.1).into());
     }
 }
 
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
+    println!("Starting.");
     let x = 80;
     let y = 50;
     let mut ecs = World::new();
