@@ -23,7 +23,6 @@ pub struct TurnSystem;
 impl<'a> System<'a> for TurnSystem {
     type SystemData = (
         Entities<'a>,
-        WriteExpect<'a, GameLog>,
         WriteExpect<'a, PendingMoves>,
         ReadStorage<'a, Priority>,
         WriteStorage<'a, ActiveTurn>,
@@ -31,7 +30,6 @@ impl<'a> System<'a> for TurnSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (entities,
-            _log,
             mut pending_moves,
             priorities,
             mut active) = data;

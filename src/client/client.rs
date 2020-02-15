@@ -4,13 +4,20 @@ use quicksilver::graphics::{Graphics, Color};
 use crate::client::glyph::Glyph;
 use crate::geom::{Point, Rect, Vector};
 use specs::{World, WorldExt};
-use crate::client::events::{handle_key, handle_click};
-use quicksilver::lifecycle::{EventStream, Window, Event, ElementState};
+use quicksilver::lifecycle::{Key, EventStream, Window, Event, ElementState};
 use crate::client::{tileset, grid};
 use crate::client::ui::{draw_box, print_glyphs};
 use crate::client::camera::render_camera;
 use crate::server::turn_system;
 use crate::resources::log::GameLog;
+use crate::message::Message;
+use crate::client::camera::get_screen_bounds;
+use crate::component;
+use crate::component::{Name, Position};
+use crate::server::gamestate::{try_move_player, move_player, clear_pickable};
+use specs::join::Join;
+
+
 
 pub struct Client {
     window: Window,
@@ -19,6 +26,7 @@ pub struct Client {
     map_region: Rect,
     tile_ctx: TileContext,
     screen_size: Vector,
+    log: GameLog,
 }
 
 impl Client {
@@ -38,7 +46,8 @@ impl Client {
             events,
             map_region,
             tile_ctx,
-            screen_size
+            screen_size,
+            log: GameLog::with_length(5)
         }
     }
 
@@ -48,10 +57,23 @@ impl Client {
         }
     }
 
+    pub fn process_messages(&mut self, messages: Vec<Message>) {
+        for message in messages {
+            match message {
+                Message::GameEvent(msg, fg, bg) => self.log.push(
+                    msg.as_str(),
+                    fg,
+                    bg,
+                ),
+                _ => unimplemented!()
+            }
+        }
+    }
+
     pub fn handle_event(&mut self, ecs: &mut World, event: Event) -> bool {
         match event {
             Event::KeyboardInput { key, state } => {
-                handle_key(ecs, key, state);
+                self.handle_key(ecs, key, state);
                 true
             }
             Event::MouseMoved { pointer: _, position } => {
@@ -74,11 +96,45 @@ impl Client {
                         pos = self.tile_ctx.grid.point_to_grid((mouse.x, mouse.y));
                     }
 
-                    handle_click(ecs, &self.map_region,  &self.tile_ctx,pos);
+                    self.handle_click(ecs,pos);
                 }
                 state == ElementState::Pressed
             }
             _ => false,
+        }
+    }
+
+    pub fn handle_key(&mut self, ecs: &mut World, key: Key, state: ElementState) {
+        if state == ElementState::Pressed {
+            match key {
+                Key::W => try_move_player(0, -1, ecs),
+                Key::A => try_move_player(-1, 0, ecs),
+                Key::S => try_move_player(0, 1, ecs),
+                Key::D => try_move_player(1, 0, ecs),
+                _ => {}
+            }
+        }
+    }
+
+
+    pub fn handle_click(&mut self, ecs: &mut World, point: impl Into<Point>) {
+        let point = point.into();
+        let (min_x, _max_x, min_y, _max_y) = get_screen_bounds(&ecs, &self.tile_ctx);
+        let point: Point = (
+            point.x + min_x + self.map_region.origin.x,
+            point.y + min_y + self.map_region.origin.y,
+        )
+            .into();
+        let names = ecs.read_storage::<Name>();
+        let positions = ecs.read_storage::<Position>();
+        for (name, position) in (&names, &positions).join() {
+            if position.x == point.x && position.y == point.y {
+                self.log.push(
+                    &format!("You clicked on {}", name.name),
+                    Some(Color::GREEN),
+                    None,
+                );
+            }
         }
     }
 
@@ -96,11 +152,8 @@ impl Client {
             None,
             None,
         );
-        {
-            let log = ecs.fetch::<GameLog>();
-            for (index, glyphs) in log.iter().enumerate() {
-                print_glyphs(gfx, &self.tile_ctx, &glyphs, (1, (y - 6 + index as i32) as i32));
-            }
+        for (index, glyphs) in self.log.iter().enumerate() {
+            print_glyphs(gfx, &self.tile_ctx, &glyphs, (1, (y - 6 + index as i32) as i32));
         }
 
         render_camera(ecs,  map_region, tile_ctx, gfx);

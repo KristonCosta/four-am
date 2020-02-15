@@ -7,7 +7,7 @@ use instant::Instant;
 use quicksilver::graphics::Graphics;
 use crate::server::server::Server;
 use crate::client::client::Client;
-
+pub mod message;
 pub mod server;
 pub mod resources;
 pub mod client;
@@ -100,6 +100,8 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             println!("TPS {}", turns);
             turns = 0;
         }
+        let messages = server.messages();
+        client.process_messages(messages);
         client.render(&mut server.world);
     }
 }

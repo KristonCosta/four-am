@@ -10,6 +10,8 @@ use crate::resources::log::GameLog;
 use crate::component::{Killed, TurnState};
 use crate::client::client::Focus;
 use specs::join::Join;
+use crate::server::server::MessageQueue;
+use crate::message::Message;
 
 pub struct GameState {
     pub(crate) ecs: World,
@@ -61,6 +63,7 @@ pub fn generate_pickable(ecs: &mut World, start: TilePos) {
 }
 
 pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
+    let mut message_queue = ecs.write_resource::<MessageQueue>();
     let mut positions = ecs.write_storage::<component::Position>();
     let mut players = ecs.write_storage::<component::Player>();
     let mut active = ecs.write_storage::<component::ActiveTurn>();
@@ -73,19 +76,13 @@ pub fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World) {
 
         let coord = map.coord_to_index(desired_x, desired_y);
         if map.blocked[coord] {
-            {
-                let mut log = ecs.write_resource::<GameLog>();
-                log.push(&format!("Ouch, you hit a wall!"), Some(Color::RED), None);
-            }
+            message_queue.push(Message::GameEvent(format!("Ouch, you hit a wall!"), Some(Color::RED), None));
         } else if let Some(entity) = map.tile_content[coord] {
-            {
-                let mut log = ecs.write_resource::<GameLog>();
-                let name = names.get(entity);
-                if let Some(name) = name {
-                    log.push(&format!("Ouch, you killed {}", name.name), Some(Color::RED), None);
-                }
-                killed.insert(entity, Killed).expect("failed to insert killed");
+            let name = names.get(entity);
+            if let Some(name) = name {
+                message_queue.push(Message::GameEvent(format!("Ouch, you killed {}", name.name), Some(Color::RED), None));
             }
+            killed.insert(entity, Killed).expect("failed to insert killed");
         } else {
             {
                 let mut focus = ecs.write_resource::<Focus>();

@@ -1,20 +1,30 @@
 use specs::{World, WorldExt, Builder, RunNow};
 use rand::Rng;
+use specs::join::Join;
+use quicksilver::graphics::Color;
+
 use crate::{component, color};
 use crate::component::{Killed, Position, register_components};
 use crate::client::glyph::Glyph;
-
 use crate::geom::Vector;
 use crate::server::{ai, turn_system, map};
-use quicksilver::graphics::Color;
 use crate::server::map::{RoomMapBuilder, MapBuilder};
 use crate::client::client::{Focus, MouseState};
 use crate::resources::log::GameLog;
-use specs::join::Join;
+use crate::message::Message;
 
 pub struct Server {
-    logs: Vec<String>,
     pub(crate) world: World,
+}
+
+pub struct MessageQueue {
+    messages: Vec<Message>
+}
+
+impl MessageQueue {
+    pub fn push(&mut self, message: Message) {
+        self.messages.push(message);
+    }
 }
 
 impl Server {
@@ -22,6 +32,7 @@ impl Server {
         println!("Starting.");
 
         let mut ecs = World::new();
+
         register_components(&mut ecs);
         register_resources(&mut ecs);
         let (map, position) = RoomMapBuilder::build((60, 30), 10);
@@ -31,7 +42,10 @@ impl Server {
             y: position.1,
         };
         ecs.insert(focus);
-
+        let mut message_queue = MessageQueue {
+            messages: vec![]
+        };
+        ecs.insert(message_queue);
         for i in 1..100 {
             generate_centipede(&mut ecs, i);
         }
@@ -59,9 +73,13 @@ impl Server {
             .with(component::TileBlocker)
             .build();
         Server {
-            logs: vec![],
             world: ecs
         }
+    }
+
+    pub fn messages(&mut self) -> Vec<Message> {
+        let mut queue = self.world.write_resource::<MessageQueue>();
+        queue.messages.drain(..).collect()
     }
 
     pub fn tick(&mut self) {
@@ -78,14 +96,10 @@ impl Server {
 }
 
 pub fn register_resources(ecs: &mut World) {
-    let mut log = GameLog::with_length(5);
-    log.push("Hello, world!", Some(Color::GREEN), None);
-
     let mouse = MouseState { x: 0, y: 0 };
 
     let turn = turn_system::PendingMoves::new();
     ecs.insert(turn);
-    ecs.insert(log);
     ecs.insert(mouse);
 }
 

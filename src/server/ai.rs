@@ -3,14 +3,15 @@ use specs::prelude::*;
 use std::cmp::{min, max};
 use quicksilver::graphics::Color;
 use rand::Rng;
-use crate::resources::log::GameLog;
+use crate::server::server::MessageQueue;
+use crate::message::Message;
 
 pub struct MonsterAi;
 
 impl<'a> System<'a> for MonsterAi {
     type SystemData = (
         ReadExpect<'a, crate::server::map::Map>,
-        WriteExpect<'a, GameLog>,
+        WriteExpect<'a, MessageQueue>,
         ReadStorage<'a, Monster>,
         WriteStorage<'a, ActiveTurn>,
         WriteStorage<'a, Position>,
@@ -20,7 +21,7 @@ impl<'a> System<'a> for MonsterAi {
 
     fn run(&mut self, data: Self::SystemData) {
         let (map,
-             mut log,
+             mut queue,
              monsters,
              mut turns,
              mut positions,
@@ -39,11 +40,11 @@ impl<'a> System<'a> for MonsterAi {
 
             let coord = map.coord_to_index(desired_x, desired_y);
             if map.blocked[coord] {
-                log.push(&format!("Da {} hit a wall!", name.name), Some(Color::RED), None);
+                queue.push(Message::GameEvent(format!("Da {} hit a wall!", name.name), Some(Color::RED), None));
             } else if let Some(entity) = map.tile_content[coord] {
                 let other_name = names.get(entity);
                 if let Some(other_name) = other_name {
-                    log.push(&format!("Ouch, {} killed {}", name.name, other_name.name), Some(Color::RED), None);
+                    queue.push(Message::GameEvent(format!("Ouch, {} killed {}", name.name, other_name.name), Some(Color::RED), None));
                 }
                 to_kill.push(entity);
             } else {
