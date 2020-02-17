@@ -1,8 +1,8 @@
-use crate::geom::Rect;
-use rand::{Rng};
-use std::cmp::{max, min};
 use crate::component::{Position, TileBlocker};
+use crate::geom::Rect;
 use legion::prelude::*;
+use rand::Rng;
+use std::cmp::{max, min};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TileType {
@@ -194,8 +194,7 @@ pub fn dig_vertical(map: &mut Map, start: i32, end: i32, x: i32) {
 pub fn map_indexer() -> Box<dyn Schedulable> {
     SystemBuilder::new("map_indexer")
         .write_resource::<Map>()
-        .with_query(<(Read<Position>,
-                      Read<TileBlocker>)>::query())
+        .with_query(<(Read<Position>, Read<TileBlocker>)>::query())
         .build(move |_, mut world, (map), query| {
             let map: &mut Map = map;
             map.refresh_blocked();

@@ -1,9 +1,8 @@
-use crate::frontend::client::{TileContext, RenderContext};
+use crate::frontend::client::{RenderContext, TileContext};
 use crate::frontend::glyph::Glyph;
 
 use crate::geom::{Point, Rect};
 use quicksilver::graphics::{Color, Graphics};
-
 
 pub fn draw_box(
     render_context: &mut RenderContext,
@@ -19,10 +18,7 @@ pub fn draw_box(
     let horizontal = Glyph::from('═', fg, bg);
 
     render_context.draw(&top_left, (rect.origin.x, rect.origin.y));
-    render_context.draw(
-        &top_right,
-        (rect.origin.x + rect.size.width, rect.origin.y),
-    );
+    render_context.draw(&top_right, (rect.origin.x + rect.size.width, rect.origin.y));
     render_context.draw(
         &bottom_left,
         (rect.origin.x, rect.origin.y + rect.size.height),

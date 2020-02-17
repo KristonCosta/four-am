@@ -1,21 +1,18 @@
+use crate::component::{Killed, Name, Position, TurnState};
 use crate::frontend::glyph::Glyph;
-use crate::{component, color};
-use crate::component::{Killed, Position, TurnState, Name};
-use crate::server::{ai, map};
-use crate::server::map::{RoomMapBuilder, MapBuilder, map_indexer, Map};
-use crate::server::ai::monster_ai;
-use crate::server::turn_system::{
-    PendingMoves,
-    turn_system
-};
-use crate::resources::log::GameLog;
+use crate::geom::{Point, Vector};
 use crate::message::Message;
-use crate::geom::{Vector, Point};
+use crate::resources::log::GameLog;
+use crate::server::ai::monster_ai;
+use crate::server::map::{map_indexer, Map, MapBuilder, RoomMapBuilder};
+use crate::server::turn_system::{turn_system, PendingMoves};
+use crate::server::{ai, map};
+use crate::{color, component};
 
-use rand::Rng;
-use quicksilver::graphics::Color;
 use legion::prelude::*;
-use std::cmp::{min, max};
+use quicksilver::graphics::Color;
+use rand::Rng;
+use std::cmp::{max, min};
 
 pub struct Server {
     pub(crate) world: World,
@@ -24,7 +21,7 @@ pub struct Server {
 }
 
 pub struct MessageQueue {
-    messages: Vec<Message>
+    messages: Vec<Message>,
 }
 
 impl MessageQueue {
@@ -34,7 +31,6 @@ impl MessageQueue {
 }
 
 impl Server {
-
     fn setup_ecs() -> (Universe, World, Resources) {
         let universe = Universe::new();
         let mut world = universe.create_world();
@@ -42,9 +38,7 @@ impl Server {
         let mut resources = Resources::default();
         let turn = PendingMoves::new();
 
-        let mut message_queue = MessageQueue {
-            messages: vec![]
-        };
+        let mut message_queue = MessageQueue { messages: vec![] };
         resources.insert(turn);
 
         resources.insert(message_queue);
@@ -53,7 +47,6 @@ impl Server {
     }
 
     pub fn new() -> Self {
-
         let (mut universe, mut world, mut resources) = Self::setup_ecs();
         let (map, position) = RoomMapBuilder::build((60, 30), 10);
         resources.insert(map);
@@ -61,7 +54,8 @@ impl Server {
         for i in 1..100 {
             generate_centipede(&mut command_buffer, i);
         }
-        command_buffer.start_entity()
+        command_buffer
+            .start_entity()
             .with_component(component::Position {
                 x: position.0,
                 y: position.1,
@@ -76,14 +70,13 @@ impl Server {
             })
             .with_component(component::Player)
             .with_component(component::Name {
-                name: "Player".to_string()
+                name: "Player".to_string(),
             })
-            .with_component(component::Priority{
-                value: 100
-            })
+            .with_component(component::Priority { value: 100 })
             .with_component(component::TileBlocker)
             .build();
         command_buffer.write(&mut world);
+
         let schedule = Schedule::builder()
             .add_system(map_indexer())
             .add_system(turn_system())
@@ -102,14 +95,24 @@ impl Server {
 
     pub fn messages(&mut self) -> Vec<Message> {
         let mut queue = self.resources.get_mut::<MessageQueue>();
-        queue.expect("failed to get resource").messages.drain(..).collect()
+        queue
+            .expect("failed to get resource")
+            .messages
+            .drain(..)
+            .collect()
     }
 
     pub fn tick(&mut self) {
         let world = &mut self.world;
         let resources = &mut self.resources;
         let schedule = &mut self.schedule;
+        let (sender, receiver) = crossbeam_channel::unbounded();
+        world.subscribe(sender, any());
+
         schedule.execute(world, resources);
+        for event in receiver.try_iter() {
+            println!("{:?}", event);
+        }
     }
 
     pub fn try_move_player(&mut self, delta_x: i32, delta_y: i32) -> bool {
@@ -120,7 +123,8 @@ impl Server {
         let mut query = <(
             Write<component::Position>,
             Write<component::Player>,
-            Write<component::ActiveTurn>)>::query();
+            Write<component::ActiveTurn>,
+        )>::query();
 
         let mut command_buffer = CommandBuffer::new(&world);
         let mut killed = vec![];
@@ -131,7 +135,11 @@ impl Server {
 
             let coord = map.coord_to_index(desired_x, desired_y);
             if map.blocked[coord] {
-                message_queue.push(Message::GameEvent(format!("Ouch, you hit a wall!"), Some(Color::RED), None));
+                message_queue.push(Message::GameEvent(
+                    format!("Ouch, you hit a wall!"),
+                    Some(Color::RED),
+                    None,
+                ));
             } else if let Some(entity) = map.tile_content[coord] {
                 killed.push(entity);
                 command_buffer.add_component(entity, Killed);
@@ -144,7 +152,11 @@ impl Server {
         }
         for entity in killed {
             let name = world.get_component::<Name>(entity).unwrap();
-            message_queue.push(Message::GameEvent(format!("Ouch, you killed {}", name.name), Some(Color::RED), None));
+            message_queue.push(Message::GameEvent(
+                format!("Ouch, you killed {}", name.name),
+                Some(Color::RED),
+                None,
+            ));
         }
 
         command_buffer.write(world);
@@ -158,7 +170,8 @@ impl Server {
         let mut query = <(
             Write<component::Position>,
             Write<component::Player>,
-            Write<component::ActiveTurn>)>::query();
+            Write<component::ActiveTurn>,
+        )>::query();
         for (mut pos, _, mut turn) in query.iter_mut(world) {
             pos.x = desired_pos.x;
             pos.y = desired_pos.y;
@@ -168,11 +181,12 @@ impl Server {
     }
 }
 
-fn generate_centipede(buffer: &mut CommandBuffer, i :u32) {
+fn generate_centipede(buffer: &mut CommandBuffer, i: u32) {
     let mut rng = rand::thread_rng();
     let position_x = rng.gen_range(10, 50);
     let position_y = rng.gen_range(10, 20);
-    buffer.start_entity()
+    buffer
+        .start_entity()
         .with_component(component::Position {
             x: position_x,
             y: position_y,
@@ -186,38 +200,32 @@ fn generate_centipede(buffer: &mut CommandBuffer, i :u32) {
             },
         })
         .with_component(component::Name {
-                name: format!("Giant Centipede {}", i),
-            })
-        .with_component(component::Priority {
-            value: 1,
+            name: format!("Giant Centipede {}", i),
         })
+        .with_component(component::Priority { value: 1 })
         .with_component(component::TileBlocker)
         .with_component(component::Monster)
         .build();
 }
 
 pub fn generate_blood(buffer: &mut CommandBuffer, pos: Vector) {
-    buffer.start_entity()
-        .with_component(component::Position {
-                x: pos.x,
-                y: pos.y,
-            })
+    buffer
+        .start_entity()
+        .with_component(component::Position { x: pos.x, y: pos.y })
         .with_component(component::Renderable {
-                glyph: Glyph {
-                    ch: '%',
-                    foreground: Some(color::RED),
-                    background: None,
-                    render_order: 100
-                }
-            }
-        )
+            glyph: Glyph {
+                ch: '%',
+                foreground: Some(color::RED),
+                background: None,
+                render_order: 100,
+            },
+        })
         .build();
 }
 
 pub fn sweep() -> Box<dyn Schedulable> {
     SystemBuilder::new("sweep_system")
-        .with_query(<(Read<Killed>,
-                      Read<Position>)>::query())
+        .with_query(<(Read<Killed>, Read<Position>)>::query())
         .build(move |command_buffer, mut world, _, query| {
             let mut killed = vec![];
             for (entity, (_, position)) in query.iter_entities(&mut world) {

@@ -1,5 +1,5 @@
-use crate::frontend::glyph::Glyph;
 use crate::frontend::font::Font;
+use crate::frontend::glyph::Glyph;
 
 use crate::error::Result;
 use crate::geom::{Rect, To};

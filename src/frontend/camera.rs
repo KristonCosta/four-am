@@ -1,15 +1,13 @@
-use crate::frontend::client::{TileContext, Client};
-use quicksilver::graphics::{Graphics, Color};
-use crate::frontend::glyph::Glyph;
-use crate::server::map::{TileType, Map};
 use crate::component;
-use crate::geom::{Rect, Point, Vector};
+use crate::frontend::client::{Client, TileContext};
+use crate::frontend::glyph::Glyph;
+use crate::geom::{Point, Rect, Vector};
+use crate::server::map::{Map, TileType};
 use legion::prelude::*;
+use quicksilver::graphics::{Color, Graphics};
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
-pub fn render_camera(
-    client: &mut Client,
-) {
+pub fn render_camera(client: &mut Client) {
     let (min_x, max_x, min_y, max_y) = get_screen_bounds(client);
     let (map_width, map_height) = client.resources().get::<Map>().unwrap().size;
     let map_region = client.map_region();
@@ -37,7 +35,9 @@ pub fn render_camera(
 
                 match tile {
                     TileType::Wall => {
-                        client.render_context.draw(&Glyph::from('#', Some(Color::GREEN), None), (x, y));
+                        client
+                            .render_context
+                            .draw(&Glyph::from('#', Some(Color::GREEN), None), (x, y));
                     }
                     TileType::Floor => {
                         client.render_context.draw(
@@ -47,15 +47,14 @@ pub fn render_camera(
                     }
                 }
             } else {
-                client.render_context.draw(&Glyph::from('-', Some(Color::WHITE), None), (x, y));
+                client
+                    .render_context
+                    .draw(&Glyph::from('-', Some(Color::WHITE), None), (x, y));
             }
         }
     }
 
-
-    let mut query = <(
-        Read<component::Position>,
-        Read<component::Renderable>)>::query();
+    let mut query = <(Read<component::Position>, Read<component::Renderable>)>::query();
     let world = client.network_client.world();
     let mut data = query.iter(world).collect::<Vec<_>>();
     data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));

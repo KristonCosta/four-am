@@ -1,18 +1,16 @@
+use crate::geom::Vector;
+use crate::server::map::Map;
 use crate::server::server::Server;
 use legion::prelude::*;
-use crate::geom::{Vector};
-use crate::server::map::Map;
 use std::ops::Deref;
 
 pub struct NetworkClient {
-    server: Option<Server>
+    server: Option<Server>,
 }
 
 impl NetworkClient {
     pub fn new() -> Self {
-        NetworkClient {
-            server: None
-        }
+        NetworkClient { server: None }
     }
 
     pub fn unbind(&mut self) -> Server {
@@ -37,6 +35,9 @@ impl NetworkClient {
 
     pub fn try_move_player(&mut self, delta: impl Into<Vector>) -> bool {
         let delta = delta.into();
-        self.server.as_mut().unwrap().try_move_player(delta.x, delta.y)
+        self.server
+            .as_mut()
+            .unwrap()
+            .try_move_player(delta.x, delta.y)
     }
 }

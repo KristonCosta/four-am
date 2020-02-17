@@ -1,6 +1,6 @@
+use crate::frontend::glyph::Glyph;
 use crate::geom;
 use legion::prelude::World;
-use crate::frontend::glyph::Glyph;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Position {
@@ -34,12 +34,12 @@ pub struct FieldOfView {
 pub enum TurnState {
     PENDING,
     ACTIVE,
-    DONE
+    DONE,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActiveTurn {
-    pub state: TurnState
+    pub state: TurnState,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -53,5 +53,5 @@ pub struct Killed;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Priority {
-    pub value: u8
+    pub value: u8,
 }

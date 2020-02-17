@@ -1,26 +1,25 @@
+use crate::frontend::camera::get_screen_bounds;
+use crate::frontend::camera::render_camera;
+use crate::frontend::glyph::Glyph;
+use crate::frontend::grid::Grid;
+use crate::frontend::tileset::Tileset;
+use crate::frontend::ui::{draw_box, print_glyphs};
+use crate::frontend::{grid, tileset};
 use crate::geom::{Point, Rect, Vector};
 use legion::systems::resource::Fetch;
-use crate::frontend::grid::Grid;
-use crate::frontend::glyph::Glyph;
-use crate::frontend::{tileset, grid};
-use crate::frontend::tileset::Tileset;
-use crate::frontend::camera::render_camera;
-use crate::frontend::camera::get_screen_bounds;
-use crate::frontend::ui::{draw_box, print_glyphs};
 
 use crate::client::network_client::NetworkClient;
 use crate::component;
 use crate::component::{Name, Position};
 use crate::message::Message;
-use crate::server::turn_system;
 use crate::resources::log::GameLog;
+use crate::server::turn_system;
 
-use quicksilver::graphics::{Graphics, Color};
-use quicksilver::lifecycle::{Key, EventStream, Window, Event, ElementState};
+use quicksilver::graphics::{Color, Graphics};
+use quicksilver::lifecycle::{ElementState, Event, EventStream, Key, Window};
 
-use legion::prelude::*;
 use crate::server::map::Map;
-
+use legion::prelude::*;
 
 pub struct RenderContext {
     map_region: Rect,
@@ -72,18 +71,15 @@ impl Client {
                 mouse_position: (0, 0).into(),
                 focus: (0, 0).into(),
             },
-            network_client: NetworkClient::new()
+            network_client: NetworkClient::new(),
         }
     }
 
     pub fn sync(&mut self) {
-        let mut query = <(
-            Read<component::Player>,
-            Read<component::Position>)>::query();
+        let mut query = <(Read<component::Player>, Read<component::Position>)>::query();
         for (_, position) in query.iter(self.network_client.world()) {
             self.render_context.focus = (position.x, position.y).into();
         }
-
     }
 
     pub async fn tick(&mut self) {
@@ -95,12 +91,8 @@ impl Client {
     pub fn process_messages(&mut self, messages: Vec<Message>) {
         for message in messages {
             match message {
-                Message::GameEvent(msg, fg, bg) => self.log.push(
-                    msg.as_str(),
-                    fg,
-                    bg,
-                ),
-                _ => unimplemented!()
+                Message::GameEvent(msg, fg, bg) => self.log.push(msg.as_str(), fg, bg),
+                _ => unimplemented!(),
             }
         }
     }
@@ -111,7 +103,10 @@ impl Client {
                 self.handle_key(key, state);
                 true
             }
-            Event::MouseMoved { pointer: _, position } => {
+            Event::MouseMoved {
+                pointer: _,
+                position,
+            } => {
                 let scale = self.render_context.window.scale_factor();
                 self.render_context.mouse_position.x = position.x as i32 / scale as i32;
                 self.render_context.mouse_position.y = position.y as i32 / scale as i32;
@@ -123,7 +118,11 @@ impl Client {
                 button: _,
             } => {
                 if state == ElementState::Pressed {
-                    let pos = self.render_context.tile_ctx.grid.point_to_grid(self.render_context.mouse_position);
+                    let pos = self
+                        .render_context
+                        .tile_ctx
+                        .grid
+                        .point_to_grid(self.render_context.mouse_position);
                     self.handle_click(pos);
                 }
                 state == ElementState::Pressed
@@ -151,7 +150,6 @@ impl Client {
         }
     }
 
-
     pub fn handle_click(&mut self, point: impl Into<Point>) {
         let point = point.into();
         let (min_x, _max_x, min_y, _max_y) = get_screen_bounds(self);
@@ -160,9 +158,7 @@ impl Client {
             point.y + min_y + self.render_context.map_region.origin.y,
         )
             .into();
-        let mut query = <(
-            Read<component::Name>,
-            Read<component::Position>)>::query();
+        let mut query = <(Read<component::Name>, Read<component::Position>)>::query();
         for (name, position) in query.iter(self.network_client.world()) {
             if position.x == point.x && position.y == point.y {
                 self.log.push(
@@ -178,13 +174,17 @@ impl Client {
         let (x, y) = self.render_context.screen_size.to_tuple();
         self.render_context.gfx.clear(Color::BLACK);
         draw_box(
-                &mut self.render_context,
+            &mut self.render_context,
             Rect::new((0, y - 7).into(), (x - 1, 6).into()),
             None,
             None,
         );
         for (index, glyphs) in self.log.iter().enumerate() {
-            print_glyphs(&mut self.render_context, &glyphs, (1, (y - 6 + index as i32) as i32));
+            print_glyphs(
+                &mut self.render_context,
+                &glyphs,
+                (1, (y - 6 + index as i32) as i32),
+            );
         }
 
         render_camera(self);
@@ -224,4 +224,3 @@ impl TileContext {
         self.tileset.draw(gfx, &glyph, rect);
     }
 }
-

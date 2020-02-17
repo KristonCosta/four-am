@@ -1,7 +1,7 @@
 pub mod log {
-    use std::slice::Iter;
-    use quicksilver::graphics::Color;
     use crate::frontend::glyph::Glyph;
+    use quicksilver::graphics::Color;
+    use std::slice::Iter;
 
     pub struct GameLog {
         max_length: usize,
@@ -36,5 +36,4 @@ pub mod log {
             self.lines.iter()
         }
     }
-
 }

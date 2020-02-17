@@ -1,19 +1,19 @@
-use quicksilver::Result;
-use quicksilver::lifecycle::{Settings, run, Window, EventStream};
+use crate::server::server::Server;
 use instant::Instant;
 use quicksilver::graphics::Graphics;
-use crate::server::server::Server;
+use quicksilver::lifecycle::{run, EventStream, Settings, Window};
+use quicksilver::Result;
 
-pub mod frontend;
-pub mod message;
-pub mod server;
-pub mod resources;
 pub mod client;
+pub mod color;
 pub mod common;
 pub mod component;
-pub mod geom;
-pub mod color;
 pub mod error;
+pub mod frontend;
+pub mod geom;
+pub mod message;
+pub mod resources;
+pub mod server;
 
 fn main() {
     run(
@@ -32,10 +32,10 @@ const MS_PER_UPDATE: FP = 1.0;
 
 #[derive(Debug)]
 pub struct TimeStep {
-    last_time:   Instant,
-    delta_time:  FP,
+    last_time: Instant,
+    delta_time: FP,
     frame_count: u32,
-    frame_time:  FP,
+    frame_time: FP,
 }
 
 impl TimeStep {
@@ -43,18 +43,16 @@ impl TimeStep {
     // Grabbed this from here
     pub fn new() -> TimeStep {
         TimeStep {
-            last_time:   Instant::now(),
-            delta_time:  0.0,
+            last_time: Instant::now(),
+            delta_time: 0.0,
             frame_count: 0,
-            frame_time:  0.0,
+            frame_time: 0.0,
         }
     }
 
     pub fn delta(&mut self) -> FP {
         let current_time = Instant::now();
-        let delta = current_time.duration_since(self.last_time).as_micros()
-            as FP
-            * 0.001;
+        let delta = current_time.duration_since(self.last_time).as_micros() as FP * 0.001;
         self.last_time = current_time;
         self.delta_time = delta;
         delta
@@ -76,7 +74,6 @@ impl TimeStep {
     }
 }
 
-
 async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
     let mut timestep = TimeStep::new();
     let mut lag: f32 = 0.0;
@@ -96,7 +93,6 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             turns += 1;
             server.tick();
             lag -= MS_PER_UPDATE;
-
         }
         if let Some(fps) = timestep.frame_rate() {
             println!("FPS {}", fps);
