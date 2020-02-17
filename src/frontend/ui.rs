@@ -1,11 +1,12 @@
+use crate::frontend::client::{TileContext, RenderContext};
+use crate::frontend::glyph::Glyph;
+
 use crate::geom::{Point, Rect};
-use crate::client::glyph::Glyph;
 use quicksilver::graphics::{Color, Graphics};
-use crate::client::client::TileContext;
+
 
 pub fn draw_box(
-    gfx: &mut Graphics,
-    ctx: &TileContext,
+    render_context: &mut RenderContext,
     rect: Rect,
     fg: Option<Color>,
     bg: Option<Color>,
@@ -17,19 +18,16 @@ pub fn draw_box(
     let vertical = Glyph::from('║', fg, bg);
     let horizontal = Glyph::from('═', fg, bg);
 
-    ctx.draw(gfx, &top_left, (rect.origin.x, rect.origin.y));
-    ctx.draw(
-        gfx,
+    render_context.draw(&top_left, (rect.origin.x, rect.origin.y));
+    render_context.draw(
         &top_right,
         (rect.origin.x + rect.size.width, rect.origin.y),
     );
-    ctx.draw(
-        gfx,
+    render_context.draw(
         &bottom_left,
         (rect.origin.x, rect.origin.y + rect.size.height),
     );
-    ctx.draw(
-        gfx,
+    render_context.draw(
         &bottom_right,
         (
             rect.origin.x + rect.size.width,
@@ -39,18 +37,17 @@ pub fn draw_box(
     let (x_start, x_end) = (rect.origin.x, (rect.origin.x + rect.size.width));
     let (y_start, y_end) = (rect.origin.y, (rect.origin.y + rect.size.height));
     for x in (x_start + 1)..x_end {
-        ctx.draw(gfx, &horizontal, (x, y_start));
-        ctx.draw(gfx, &horizontal, (x, y_end));
+        render_context.draw(&horizontal, (x, y_start));
+        render_context.draw(&horizontal, (x, y_end));
     }
     for y in (y_start + 1)..y_end {
-        ctx.draw(gfx, &vertical, (x_start, y));
-        ctx.draw(gfx, &vertical, (x_end, y));
+        render_context.draw(&vertical, (x_start, y));
+        render_context.draw(&vertical, (x_end, y));
     }
 }
 
 pub fn print(
-    gfx: &mut Graphics,
-    ctx: &TileContext,
+    render_context: &mut RenderContext,
     text: &str,
     pos: impl Into<Point>,
     fg: Option<Color>,
@@ -59,18 +56,17 @@ pub fn print(
     let pos = pos.into();
     for (index, ch) in text.chars().enumerate() {
         let ch = Glyph::from(ch, fg, bg);
-        ctx.draw(gfx, &ch, (pos.x + index as i32, pos.y));
+        render_context.draw(&ch, (pos.x + index as i32, pos.y));
     }
 }
 
 pub fn print_glyphs(
-    gfx: &mut Graphics,
-    ctx: &TileContext,
+    render_context: &mut RenderContext,
     glyphs: &Vec<Glyph>,
     pos: impl Into<Point>,
 ) {
     let pos = pos.into();
     for (index, glyph) in glyphs.iter().enumerate() {
-        ctx.draw(gfx, &glyph, (pos.x + index as i32, pos.y));
+        render_context.draw(&glyph, (pos.x + index as i32, pos.y));
     }
 }

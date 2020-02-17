@@ -1,7 +1,8 @@
+use crate::frontend::glyph::Glyph;
+use crate::frontend::font::Font;
+
 use crate::error::Result;
-use crate::client::font::Font;
 use crate::geom::{Rect, To};
-use crate::client::glyph::Glyph;
 use quicksilver::graphics::{Graphics, Image};
 use std::collections::HashMap;
 

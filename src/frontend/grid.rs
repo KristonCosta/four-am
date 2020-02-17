@@ -35,7 +35,7 @@ impl Grid {
         )
     }
 
-    pub fn point_to_grid(&self, point: impl Into<Point>) -> Point {
+    pub fn point_to_grid(&self, point: impl Into<Vector>) -> Point {
         let point = point.into();
         (point.x / self.width_multi, point.y / self.height_multi).into()
     }

@@ -1,7 +1,7 @@
 pub mod log {
-    use crate::client::glyph::Glyph;
     use std::slice::Iter;
     use quicksilver::graphics::Color;
+    use crate::frontend::glyph::Glyph;
 
     pub struct GameLog {
         max_length: usize,

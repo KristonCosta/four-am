@@ -1,6 +1,6 @@
 use quicksilver::graphics::Color;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Glyph {
     pub ch: char,
     pub foreground: Option<Color>,

@@ -33,7 +33,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ./cargo-web-target
-          key: ${{ runner.os }}_nightly-2019-11-25_cargo-web-target
+          key: ${{ runner.os }}_nightly-2019-11-25_cargo-web-target-02-17
 
       - name: Get Cargo Web
         uses: actions-rs/cargo@v1 

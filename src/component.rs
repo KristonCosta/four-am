@@ -1,70 +1,57 @@
 use crate::geom;
-use crate::client::glyph;
-use specs::prelude::*;
+use legion::prelude::World;
+use crate::frontend::glyph::Glyph;
 
-#[derive(Component, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
 
-#[derive(Component, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Renderable {
-    pub glyph: glyph::Glyph,
+    pub glyph: Glyph,
 }
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Player;
 
-#[derive(Component)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Name {
     pub name: String,
 }
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PickableTile;
 
-#[derive(Component)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FieldOfView {
     pub visible_tiles: Vec<geom::Point>,
     pub range: i32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TurnState {
     PENDING,
     ACTIVE,
     DONE
 }
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActiveTurn {
     pub state: TurnState
 }
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Monster;
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TileBlocker;
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Killed;
 
-#[derive(Component)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Priority {
     pub value: u8
-}
-
-pub fn register_components(ecs: &mut World) {
-    ecs.register::<Position>();
-    ecs.register::<Renderable>();
-    ecs.register::<Player>();
-    ecs.register::<Name>();
-    ecs.register::<PickableTile>();
-    ecs.register::<FieldOfView>();
-    ecs.register::<Monster>();
-    ecs.register::<ActiveTurn>();
-    ecs.register::<Priority>();
-    ecs.register::<TileBlocker>();
-    ecs.register::<Killed>();
 }

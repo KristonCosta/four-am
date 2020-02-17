@@ -3,8 +3,8 @@ use crate::component::{
     Priority,
     TurnState,
 };
-use specs::prelude::*;
 use crate::resources::log::GameLog;
+use legion::prelude::*;
 
 pub struct PendingMoves {
     list: Vec<Entity>
@@ -18,53 +18,48 @@ impl PendingMoves {
     }
 }
 
-pub struct TurnSystem;
+pub fn turn_system() -> Box<dyn Schedulable> {
+    SystemBuilder::new("turn_system")
+        .write_resource::<PendingMoves>()
+        .with_query(<(Read<ActiveTurn>)>::query())
+        .with_query( <(Read<Priority>)>::query())
+        .build(move |
+            command_buffer,
+            mut world,
+            (pending_moves),
+            (turn_query, priority_query)| {
+            let mut active_entity = turn_query
+                .iter_entities(world)
+                .next();
+            let still_active = match active_entity {
+                Some((entity, active_turn)) => {
+                    if active_turn.state == TurnState::DONE {
+                        command_buffer.remove_component::<ActiveTurn>(entity);
+                        false
+                    } else {
+                        true
+                    }
+                },
+                None => {
+                    false
+                }
+            };
 
-impl<'a> System<'a> for TurnSystem {
-    type SystemData = (
-        Entities<'a>,
-        WriteExpect<'a, PendingMoves>,
-        ReadStorage<'a, Priority>,
-        WriteStorage<'a, ActiveTurn>,
-    );
+            if !still_active {
+                if pending_moves.list.is_empty() {
+                    let mut priority_tuple = vec![];
 
-    fn run(&mut self, data: Self::SystemData) {
-        let (entities,
-            mut pending_moves,
-            priorities,
-            mut active) = data;
+                    for (entity, (priority)) in priority_query.iter_entities_mut(world) {
+                        priority_tuple.push((priority.value, entity));
+                    }
+                    priority_tuple.sort_by_key(|k| k.0);
+                    pending_moves.list = priority_tuple.iter().map(|v| v.1).collect();
+                }
 
-        let mut finished = vec![];
-        let mut active_entity = false;
-        for (entity, turn) in (&entities, &mut active).join() {
-            active_entity = true;
-            match turn.state {
-                TurnState::DONE => finished.push(entity.clone()),
-                _ => (),
+                let next_turn = pending_moves.list.pop().expect("No entites could take a turn");
+                command_buffer.add_component(next_turn, ActiveTurn{
+                    state: TurnState::PENDING
+                });
             }
-        }
-
-        if finished.is_empty() && active_entity {
-            return
-        }
-
-        for entity in finished {
-            active.remove(entity);
-        }
-
-        if pending_moves.list.is_empty() {
-            let mut priority_tuple = vec![];
-            for (entity, priority) in (&entities, &priorities).join() {
-                priority_tuple.push((priority.value, entity));
-            }
-            priority_tuple.sort_by_key(|k| k.0);
-            pending_moves.list = priority_tuple.iter().map(|v| v.1).collect();
-        }
-
-        let next_turn = pending_moves.list.pop().expect("No entites could take a turn");
-        active.insert(next_turn, ActiveTurn{
-            state: TurnState::PENDING
-        });
-    }
+        })
 }
-

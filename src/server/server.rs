@@ -1,20 +1,26 @@
-use specs::{World, WorldExt, Builder, RunNow};
-use rand::Rng;
-use specs::join::Join;
-use quicksilver::graphics::Color;
-
+use crate::frontend::glyph::Glyph;
 use crate::{component, color};
-use crate::component::{Killed, Position, register_components};
-use crate::client::glyph::Glyph;
-use crate::geom::Vector;
-use crate::server::{ai, turn_system, map};
-use crate::server::map::{RoomMapBuilder, MapBuilder};
-use crate::client::client::{Focus, MouseState};
+use crate::component::{Killed, Position, TurnState, Name};
+use crate::server::{ai, map};
+use crate::server::map::{RoomMapBuilder, MapBuilder, map_indexer, Map};
+use crate::server::ai::monster_ai;
+use crate::server::turn_system::{
+    PendingMoves,
+    turn_system
+};
 use crate::resources::log::GameLog;
 use crate::message::Message;
+use crate::geom::{Vector, Point};
+
+use rand::Rng;
+use quicksilver::graphics::Color;
+use legion::prelude::*;
+use std::cmp::{min, max};
 
 pub struct Server {
     pub(crate) world: World,
+    pub(crate) resources: Resources,
+    schedule: Schedule,
 }
 
 pub struct MessageQueue {
@@ -28,34 +34,39 @@ impl MessageQueue {
 }
 
 impl Server {
-    pub fn new() -> Self {
-        println!("Starting.");
 
-        let mut ecs = World::new();
+    fn setup_ecs() -> (Universe, World, Resources) {
+        let universe = Universe::new();
+        let mut world = universe.create_world();
 
-        register_components(&mut ecs);
-        register_resources(&mut ecs);
-        let (map, position) = RoomMapBuilder::build((60, 30), 10);
-        ecs.insert(map);
-        let focus = Focus {
-            x: position.0,
-            y: position.1,
-        };
-        ecs.insert(focus);
+        let mut resources = Resources::default();
+        let turn = PendingMoves::new();
+
         let mut message_queue = MessageQueue {
             messages: vec![]
         };
-        ecs.insert(message_queue);
-        for i in 1..100 {
-            generate_centipede(&mut ecs, i);
-        }
+        resources.insert(turn);
 
-        ecs.create_entity()
-            .with(component::Position {
+        resources.insert(message_queue);
+
+        (universe, world, resources)
+    }
+
+    pub fn new() -> Self {
+
+        let (mut universe, mut world, mut resources) = Self::setup_ecs();
+        let (map, position) = RoomMapBuilder::build((60, 30), 10);
+        resources.insert(map);
+        let mut command_buffer = CommandBuffer::new(&world);
+        for i in 1..100 {
+            generate_centipede(&mut command_buffer, i);
+        }
+        command_buffer.start_entity()
+            .with_component(component::Position {
                 x: position.0,
                 y: position.1,
             })
-            .with(component::Renderable {
+            .with_component(component::Renderable {
                 glyph: Glyph {
                     ch: '@',
                     foreground: Some(Color::YELLOW),
@@ -63,56 +74,110 @@ impl Server {
                     render_order: 3,
                 },
             })
-            .with(component::Player {})
-            .with(component::Name {
-                name: "Player".to_string(),
+            .with_component(component::Player)
+            .with_component(component::Name {
+                name: "Player".to_string()
             })
-            .with(component::Priority{
+            .with_component(component::Priority{
                 value: 100
             })
-            .with(component::TileBlocker)
+            .with_component(component::TileBlocker)
             .build();
+        command_buffer.write(&mut world);
+        let schedule = Schedule::builder()
+            .add_system(map_indexer())
+            .add_system(turn_system())
+            .flush()
+            .add_system(monster_ai())
+            .flush()
+            .add_system(sweep())
+            .build();
+
         Server {
-            world: ecs
+            world,
+            resources,
+            schedule,
         }
     }
 
     pub fn messages(&mut self) -> Vec<Message> {
-        let mut queue = self.world.write_resource::<MessageQueue>();
-        queue.messages.drain(..).collect()
+        let mut queue = self.resources.get_mut::<MessageQueue>();
+        queue.expect("failed to get resource").messages.drain(..).collect()
     }
 
     pub fn tick(&mut self) {
-        let mut ms = ai::MonsterAi;
-        let mut ts = turn_system::TurnSystem;
-        let mut indexer = map::MapIndexer;
-        let mut ecs = &mut self.world;
-        indexer.run_now(ecs);
-        ms.run_now(ecs);
-        ts.run_now(ecs);
-        sweep(ecs);
-        ecs.maintain();
+        let world = &mut self.world;
+        let resources = &mut self.resources;
+        let schedule = &mut self.schedule;
+        schedule.execute(world, resources);
+    }
+
+    pub fn try_move_player(&mut self, delta_x: i32, delta_y: i32) -> bool {
+        let world = &mut self.world;
+        let resources = &mut self.resources;
+        let mut message_queue = resources.get_mut::<MessageQueue>().unwrap();
+        let mut map = resources.get_mut::<Map>().unwrap();
+        let mut query = <(
+            Write<component::Position>,
+            Write<component::Player>,
+            Write<component::ActiveTurn>)>::query();
+
+        let mut command_buffer = CommandBuffer::new(&world);
+        let mut killed = vec![];
+        let mut moved = false;
+        for (mut pos, _, mut turn) in query.iter_mut(world) {
+            let desired_x = min(map.size.0, max(0, pos.x + delta_x));
+            let desired_y = min(map.size.1, max(0, pos.y + delta_y));
+
+            let coord = map.coord_to_index(desired_x, desired_y);
+            if map.blocked[coord] {
+                message_queue.push(Message::GameEvent(format!("Ouch, you hit a wall!"), Some(Color::RED), None));
+            } else if let Some(entity) = map.tile_content[coord] {
+                killed.push(entity);
+                command_buffer.add_component(entity, Killed);
+            } else {
+                pos.x = desired_x;
+                pos.y = desired_y;
+                turn.state = TurnState::DONE;
+                moved = true;
+            }
+        }
+        for entity in killed {
+            let name = world.get_component::<Name>(entity).unwrap();
+            message_queue.push(Message::GameEvent(format!("Ouch, you killed {}", name.name), Some(Color::RED), None));
+        }
+
+        command_buffer.write(world);
+        moved
+    }
+
+    pub fn move_player(&mut self, desired_pos: impl Into<Point>) {
+        let desired_pos = desired_pos.into();
+        let world = &mut self.world;
+        let resources = &mut self.resources;
+        let mut query = <(
+            Write<component::Position>,
+            Write<component::Player>,
+            Write<component::ActiveTurn>)>::query();
+        for (mut pos, _, mut turn) in query.iter_mut(world) {
+            pos.x = desired_pos.x;
+            pos.y = desired_pos.y;
+            turn.state = TurnState::DONE;
+            break;
+        }
     }
 }
 
-pub fn register_resources(ecs: &mut World) {
-    let mouse = MouseState { x: 0, y: 0 };
-
-    let turn = turn_system::PendingMoves::new();
-    ecs.insert(turn);
-    ecs.insert(mouse);
-}
-
-fn generate_centipede(ecs: &mut World, i :u32) {
+fn generate_centipede(buffer: &mut CommandBuffer, i :u32) {
     let mut rng = rand::thread_rng();
     let position_x = rng.gen_range(10, 50);
     let position_y = rng.gen_range(10, 20);
-    ecs.create_entity()
-        .with(component::Position {
+    buffer.start_entity()
+        .with_component(component::Position {
             x: position_x,
             y: position_y,
         })
-        .with(component::Renderable {
+        .with_component(component::Renderable {
             glyph: Glyph {
                 ch: 'C',
                 foreground: Some(color::TAN),
@@ -120,47 +185,47 @@ fn generate_centipede(ecs: &mut World, i :u32) {
                 render_order: 3,
             },
         })
-        .with(component::Name {
-            name: format!("Giant Centipede {}", i),
-        })
-        .with(component::Priority {
+        .with_component(component::Name {
+                name: format!("Giant Centipede {}", i),
+            })
+        .with_component(component::Priority {
             value: 1,
         })
-        .with(component::TileBlocker)
-        .with(component::Monster)
+        .with_component(component::TileBlocker)
+        .with_component(component::Monster)
         .build();
 }
 
-pub fn generate_blood(ecs: &mut World, pos: Vector) {
-    ecs.create_entity()
-        .with(component::Position {
-            x: pos.x,
-            y: pos.y,
-        })
-        .with(component::Renderable {
-            glyph: Glyph {
-                ch: '%',
-                foreground: Some(color::RED),
-                background: None,
-                render_order: 100
+pub fn generate_blood(buffer: &mut CommandBuffer, pos: Vector) {
+    buffer.start_entity()
+        .with_component(component::Position {
+                x: pos.x,
+                y: pos.y,
+            })
+        .with_component(component::Renderable {
+                glyph: Glyph {
+                    ch: '%',
+                    foreground: Some(color::RED),
+                    background: None,
+                    render_order: 100
+                }
+            }
+        )
+        .build();
+}
+
+pub fn sweep() -> Box<dyn Schedulable> {
+    SystemBuilder::new("sweep_system")
+        .with_query(<(Read<Killed>,
+                      Read<Position>)>::query())
+        .build(move |command_buffer, mut world, _, query| {
+            let mut killed = vec![];
+            for (entity, (_, position)) in query.iter_entities(&mut world) {
+                killed.push((entity, (position.x, position.y)));
+            }
+            for (entity, position) in killed {
+                command_buffer.delete(entity);
+                generate_blood(command_buffer, (position.0, position.1).into());
             }
         })
-        .build();
-}
-
-pub fn sweep(ecs: &mut World) {
-    let mut killed = vec![];
-    {
-        let combat_stats = ecs.read_storage::<Killed>();
-        let positions = ecs.read_storage::<Position>();
-        let entities = ecs.entities();
-        for (entity, _stats, position) in (&entities, &combat_stats, &positions).join() {
-            killed.push((entity, (position.x, position.y)));
-        }
-    }
-
-    for (entity, position) in killed {
-        ecs.delete_entity(entity).expect("Failed to delete entity");
-        generate_blood(ecs, (position.0, position.1).into());
-    }
 }

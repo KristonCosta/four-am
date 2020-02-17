@@ -1,12 +1,10 @@
-#[macro_use]
-extern crate specs_derive;
-
 use quicksilver::Result;
 use quicksilver::lifecycle::{Settings, run, Window, EventStream};
 use instant::Instant;
 use quicksilver::graphics::Graphics;
 use crate::server::server::Server;
-use crate::client::client::Client;
+
+pub mod frontend;
 pub mod message;
 pub mod server;
 pub mod resources;
@@ -84,10 +82,15 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let mut lag: f32 = 0.0;
     let mut turns = 0;
     let mut server = Server::new();
-    let mut client = Client::new(window, gfx, events).await;
+    let mut client = frontend::client::Client::new(window, gfx, events).await;
+    client.network_client.bind(server);
+    client.sync();
+    server = client.network_client.unbind();
     loop {
-
-        client.tick(&mut server.world).await;
+        // For now do this bind/unbind song and dance until fully refactored
+        client.network_client.bind(server);
+        client.tick().await;
+        server = client.network_client.unbind();
         lag += timestep.delta();
         while lag >= MS_PER_UPDATE {
             turns += 1;
@@ -101,7 +104,9 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
             turns = 0;
         }
         let messages = server.messages();
+        client.network_client.bind(server);
         client.process_messages(messages);
-        client.render(&mut server.world);
+        client.render();
+        server = client.network_client.unbind();
     }
 }

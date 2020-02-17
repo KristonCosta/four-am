@@ -1,28 +1,24 @@
-use specs::{World, WorldExt};
-use crate::client::client::{TileContext, Focus};
+use crate::frontend::client::{TileContext, Client};
 use quicksilver::graphics::{Graphics, Color};
-use crate::client::glyph::Glyph;
+use crate::frontend::glyph::Glyph;
 use crate::server::map::{TileType, Map};
 use crate::component;
-use crate::geom::Rect;
-use specs::join::Join;
+use crate::geom::{Rect, Point, Vector};
+use legion::prelude::*;
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
 pub fn render_camera(
-    ecs: &World,
-    map_region: &Rect,
-    tile_ctx: &TileContext,
-    gfx: &mut Graphics,
+    client: &mut Client,
 ) {
-    let map = ecs.fetch::<Map>();
-
-    let (min_x, max_x, min_y, max_y) = get_screen_bounds(&ecs, tile_ctx);
-    let (map_width, map_height) = map.size;
+    let (min_x, max_x, min_y, max_y) = get_screen_bounds(client);
+    let (map_width, map_height) = client.resources().get::<Map>().unwrap().size;
+    let map_region = client.map_region();
 
     for (y, ty) in (min_y..max_y).enumerate() {
         for (x, tx) in (min_x..max_x).enumerate() {
             let y = y as i32;
             let x = x as i32;
+
             if y < map_region.origin.y
                 || y > (map_region.origin.y + map_region.size.height)
                 || x < map_region.origin.x
@@ -33,32 +29,36 @@ pub fn render_camera(
             let x = x + map_region.origin.x;
             let y = y + map_region.origin.y;
             if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
+                let map = client.network_client.resources().get::<Map>().unwrap();
                 let tile = map
                     .tiles
                     .get((tx + ty * map_width) as usize)
                     .expect(&format!("Couldn't find {} {}", tx, ty));
+
                 match tile {
                     TileType::Wall => {
-                        tile_ctx.draw(gfx, &Glyph::from('#', Some(Color::GREEN), None), (x, y));
+                        client.render_context.draw(&Glyph::from('#', Some(Color::GREEN), None), (x, y));
                     }
                     TileType::Floor => {
-                        tile_ctx.draw(
-                            gfx,
+                        client.render_context.draw(
                             &Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None),
                             (x, y),
                         );
                     }
                 }
             } else {
-                tile_ctx.draw(gfx, &Glyph::from('-', Some(Color::WHITE), None), (x, y));
+                client.render_context.draw(&Glyph::from('-', Some(Color::WHITE), None), (x, y));
             }
         }
     }
 
-    let positions = ecs.read_storage::<component::Position>();
-    let renderables = ecs.read_storage::<component::Renderable>();
-    let mut data = (&positions, &renderables).join().collect::<Vec<_>>();
-    data.sort_by(|&a, &b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
+
+    let mut query = <(
+        Read<component::Position>,
+        Read<component::Renderable>)>::query();
+    let world = client.network_client.world();
+    let mut data = query.iter(world).collect::<Vec<_>>();
+    data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
     for (pos, render) in data.iter() {
         let x = pos.x - min_x - map_region.origin.x;
         let y = pos.y - min_y - map_region.origin.y;
@@ -67,14 +67,14 @@ pub fn render_camera(
             && x < (map_region.origin.x + map_region.size.width)
             && y < (map_region.origin.y + map_region.size.height)
         {
-            tile_ctx.draw(gfx, &render.glyph, (x, y));
+            client.render_context.draw(&render.glyph, (x, y));
         }
     }
 }
 
-pub fn get_screen_bounds(ecs: &World, ctx: &TileContext) -> (i32, i32, i32, i32) {
-    let focus = ecs.fetch::<Focus>();
-    let (x_chars, y_chars) = ctx.grid.size.to_tuple();
+pub fn get_screen_bounds(client: &Client) -> (i32, i32, i32, i32) {
+    let focus = client.focus();
+    let (x_chars, y_chars) = client.tile_context().grid.size.to_tuple();
 
     let center_x = x_chars / 2;
     let center_y = y_chars / 2;

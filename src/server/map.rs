@@ -1,8 +1,8 @@
 use crate::geom::Rect;
 use rand::{Rng};
-use specs::prelude::*;
 use std::cmp::{max, min};
 use crate::component::{Position, TileBlocker};
+use legion::prelude::*;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TileType {
@@ -191,23 +191,18 @@ pub fn dig_vertical(map: &mut Map, start: i32, end: i32, x: i32) {
     }
 }
 
-pub struct MapIndexer;
-
-impl<'a> System<'a> for MapIndexer {
-    type SystemData = (
-        Entities<'a>,
-        WriteExpect<'a, Map>,
-        ReadStorage<'a, Position>,
-        ReadStorage<'a, TileBlocker>
-    );
-
-    fn run(&mut self, data: Self::SystemData) {
-        let (entities, mut map, positions, blocks) = data;
-        map.refresh_blocked();
-        map.refresh_content();
-        for (entity, position, _) in (&entities, &positions, &blocks).join() {
-            let index = map.coord_to_index(position.x, position.y);
-            map.tile_content[index] = Some(entity.clone());
-        }
-    }
+pub fn map_indexer() -> Box<dyn Schedulable> {
+    SystemBuilder::new("map_indexer")
+        .write_resource::<Map>()
+        .with_query(<(Read<Position>,
+                      Read<TileBlocker>)>::query())
+        .build(move |_, mut world, (map), query| {
+            let map: &mut Map = map;
+            map.refresh_blocked();
+            map.refresh_content();
+            for (entity, (position, _)) in query.iter_entities(&mut world) {
+                let index = map.coord_to_index(position.x, position.y);
+                map.tile_content[index] = Some(entity.clone());
+            }
+        })
 }
