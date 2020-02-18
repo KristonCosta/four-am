@@ -8,7 +8,7 @@ use crate::frontend::{grid, tileset};
 use crate::geom::{Point, Rect, Vector};
 use legion::systems::resource::Fetch;
 
-use crate::client::network_client::NetworkClient;
+use crate::client::network_client::{NetworkClient, WorldType};
 use crate::component;
 use crate::component::{Name, Position};
 use crate::message::Message;
@@ -140,6 +140,8 @@ impl Client {
                 Key::Left => self.handle_focus((-1, 0)),
                 Key::Down => self.handle_focus((0, 1)),
                 Key::Right => self.handle_focus((1, 0)),
+                Key::Q => self.network_client.reload_world(WorldType::Drunken),
+                Key::E => self.network_client.reload_world(WorldType::Room),
                 _ => {}
             }
         }

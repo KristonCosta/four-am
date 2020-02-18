@@ -7,6 +7,11 @@ pub struct NetworkClient {
     server: Option<Server>,
 }
 
+pub enum WorldType {
+    Drunken,
+    Room,
+}
+
 impl NetworkClient {
     pub fn new() -> Self {
         NetworkClient { server: None }
@@ -34,5 +39,13 @@ impl NetworkClient {
             .as_mut()
             .unwrap()
             .try_move_player(delta.x, delta.y)
+    }
+
+    pub fn reload_world(&mut self, world_type: WorldType) {
+        match world_type {
+            WorldType::Drunken => self.server.as_mut().unwrap().reload_drunken_world(),
+            WorldType::Room => self.server.as_mut().unwrap().reload_room_world(),
+        }
+
     }
 }

@@ -13,7 +13,7 @@ use crate::server::systems::indexer::map_indexer;
 use crate::server::systems::turn_system::{turn_system, PendingMoves};
 use crate::server::systems::ai::monster_ai;
 use crate::map::Map;
-use crate::server::map_builders::factories::random_builder;
+use crate::server::map_builders::factories::{random_builder, drunk_builder};
 use crate::server::map_builders::BuiltMap;
 use crate::server::gamestate::RunState;
 use instant::Instant;
@@ -21,6 +21,7 @@ use instant::Instant;
 pub struct Server {
     pub(crate) world: World,
     pub(crate) resources: Resources,
+    pub(crate) universe: Universe,
     schedule: Schedule,
     run_state: RunState,
     map_state: MapState,
@@ -62,7 +63,7 @@ impl Server {
     pub fn new() -> Self {
         let (mut universe, mut world, mut resources) = Self::setup_ecs();
         let mut rng = rand::thread_rng();
-        let built_map = random_builder((80, 43).into(), 10, &mut rng);
+        let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
         let BuiltMap {
             spawn_list,
             map,
@@ -76,6 +77,7 @@ impl Server {
             Some(pos) => pos,
             None => panic!("No starting position in map!"),
         };
+
         if *with_history {
             resources.insert(history[0].clone())
         } else {
@@ -95,6 +97,7 @@ impl Server {
             world,
             resources,
             schedule,
+            universe,
             run_state: RunState::MapGeneration,
             map_state: MapState {
                 mapgen_index: 0,
@@ -102,6 +105,48 @@ impl Server {
                 mapgen_timer: Instant::now(),
             }
         }
+    }
+
+    fn reload_world(&mut self, built_map: BuiltMap) {
+        let mut world = self.universe.create_world();
+        std::mem::swap(&mut self.world, &mut world);
+        self.run_state = RunState::MapGeneration;
+        let BuiltMap {
+            spawn_list,
+            map,
+            starting_position,
+            rooms,
+            history,
+            with_history
+        } = &built_map;
+
+        let position = match starting_position {
+            Some(pos) => pos,
+            None => panic!("No starting position in map!"),
+        };
+
+        if *with_history {
+            self.resources.insert(history[0].clone())
+        } else {
+            self.resources.insert(map.clone());
+        }
+        std::mem::swap(&mut self.map_state, &mut MapState {
+            mapgen_index: 0,
+            mapgen_built_map: built_map,
+            mapgen_timer: Instant::now(),
+        });
+    }
+
+    pub fn reload_drunken_world(&mut self) {
+        let mut rng = rand::thread_rng();
+        let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
+        self.reload_world(built_map);
+    }
+
+    pub fn reload_room_world(&mut self) {
+        let mut rng = rand::thread_rng();
+        let built_map = random_builder((80, 43).into(), 10, &mut rng);
+        self.reload_world(built_map);
     }
 
     fn insert_entities(&mut self) {
@@ -153,7 +198,7 @@ impl Server {
                 schedule.execute(world, resources);
             },
             RunState::MapGeneration => {
-                if self.map_state.mapgen_timer.elapsed().as_millis() > 500 {
+                if self.map_state.mapgen_timer.elapsed().as_millis() > 200 {
                     let resources = &mut self.resources;
                     self.map_state.mapgen_index += 1;
                     if self.map_state.mapgen_index >= self.map_state.mapgen_built_map.history.len() {

@@ -4,10 +4,11 @@ use legion::prelude::*;
 use rand::Rng;
 use std::cmp::{max, min};
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TileType {
     Wall,
     Floor,
+    Digging,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -79,8 +80,21 @@ impl Map {
         ((y as usize) * self.size.x as usize) + x as usize
     }
 
+    fn point_to_index(&self, point: Point) -> usize {
+        ((point.y as usize ) * self.size.x as usize) + point.x as usize
+    }
+
     pub fn is_blocked(&self, point: Point) -> bool {
         self.blocked[self.coord_to_index(point.x, point.y)]
+    }
+
+    pub fn get_type(&self, point: Point) -> TileType {
+        self.tiles[self.point_to_index(point)]
+    }
+
+    pub fn set_type(&mut self, point: Point, t: TileType) {
+        let index = self.point_to_index(point);
+        self.tiles[index] = t
     }
 
     pub fn refresh_blocked(&mut self) {

@@ -39,13 +39,19 @@ pub fn render_camera(client: &mut Client) {
                         client
                             .render_context
                             .draw(&Glyph::from('#', Some(Color::GREEN), None), (x, y));
-                    }
+                    },
                     TileType::Floor => {
                         client.render_context.draw(
                             &Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None),
                             (x, y),
                         );
-                    }
+                    },
+                    TileType::Digging => {
+                        client.render_context.draw(
+                            &Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None),
+                            (x, y),
+                        );
+                    },
                 }
             } else {
                 client
