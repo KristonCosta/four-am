@@ -4,6 +4,7 @@ use quicksilver::graphics::Graphics;
 use quicksilver::lifecycle::{run, EventStream, Settings, Window};
 use quicksilver::Result;
 
+pub mod map;
 pub mod client;
 pub mod color;
 pub mod common;

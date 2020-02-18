@@ -1,11 +1,11 @@
 use crate::component::{ActiveTurn, Killed, Monster, Name, Position, TurnState};
 use crate::message::Message;
-use crate::server::map::Map;
 use crate::server::server::MessageQueue;
 use legion::prelude::*;
 use quicksilver::graphics::Color;
 use rand::Rng;
 use std::cmp::{max, min};
+use crate::map::Map;
 
 pub fn monster_ai() -> Box<dyn Schedulable> {
     SystemBuilder::new("monster_ai")
@@ -28,8 +28,8 @@ pub fn monster_ai() -> Box<dyn Schedulable> {
                 if delta_x + delta_y == 0 {
                     continue;
                 }
-                let desired_x = min(map.size.0, max(0, pos.x + delta_x));
-                let desired_y = min(map.size.1, max(0, pos.y + delta_y));
+                let desired_x = min(map.size.x, max(0, pos.x + delta_x));
+                let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
                 let coord = map.coord_to_index(desired_x, desired_y);
                 if map.blocked[coord] {
@@ -44,8 +44,8 @@ pub fn monster_ai() -> Box<dyn Schedulable> {
                 } else {
                     pos.x = desired_x;
                     pos.y = desired_y;
-                    turn.state = TurnState::DONE;
                 }
+                turn.state = TurnState::DONE;
             }
             for (entity, other_entity) in killed {
                 let name = world.get_component::<Name>(entity).unwrap();

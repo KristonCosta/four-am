@@ -13,12 +13,10 @@ use crate::component;
 use crate::component::{Name, Position};
 use crate::message::Message;
 use crate::resources::log::GameLog;
-use crate::server::turn_system;
 
 use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{ElementState, Event, EventStream, Key, Window};
 
-use crate::server::map::Map;
 use legion::prelude::*;
 
 pub struct RenderContext {
@@ -69,7 +67,7 @@ impl Client {
                 screen_size,
                 gfx,
                 mouse_position: (0, 0).into(),
-                focus: (0, 0).into(),
+                focus: (x/2, y/2).into(),
             },
             network_client: NetworkClient::new(),
         }
@@ -138,9 +136,17 @@ impl Client {
                 Key::A => self.handle_move((-1, 0)),
                 Key::S => self.handle_move((0, 1)),
                 Key::D => self.handle_move((1, 0)),
+                Key::Up => self.handle_focus((0, -1)),
+                Key::Left => self.handle_focus((-1, 0)),
+                Key::Down => self.handle_focus((0, 1)),
+                Key::Right => self.handle_focus((1, 0)),
                 _ => {}
             }
         }
+    }
+
+    pub fn handle_focus(&mut self, delta: impl Into<Vector>) {
+        self.render_context.focus += delta.into();
     }
 
     pub fn handle_move(&mut self, delta: impl Into<Vector>) {

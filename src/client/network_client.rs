@@ -1,5 +1,4 @@
 use crate::geom::Vector;
-use crate::server::map::Map;
 use crate::server::server::Server;
 use legion::prelude::*;
 use std::ops::Deref;
@@ -23,10 +22,6 @@ impl NetworkClient {
 
     pub fn world(&self) -> &World {
         &self.server.as_ref().unwrap().world
-    }
-
-    pub fn world_mut(&mut self) -> &mut World {
-        &mut self.server.as_mut().unwrap().world
     }
 
     pub fn resources(&self) -> &Resources {

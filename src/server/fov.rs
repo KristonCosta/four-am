@@ -1,5 +1,5 @@
-use crate::server::map::Map;
 use std::collections::HashSet;
+use crate::map::Map;
 
 pub fn calculate_fov(pos: (i32, i32), radius: u32, map: &Map) -> HashSet<(i32, i32)> {
     let mut set = HashSet::new();

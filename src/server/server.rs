@@ -3,22 +3,35 @@ use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Vector};
 use crate::message::Message;
 use crate::resources::log::GameLog;
-use crate::server::ai::monster_ai;
-use crate::server::map::{map_indexer, Map, MapBuilder, RoomMapBuilder};
-use crate::server::turn_system::{turn_system, PendingMoves};
-use crate::server::{ai, map};
 use crate::{color, component};
 
 use legion::prelude::*;
 use quicksilver::graphics::Color;
 use rand::Rng;
 use std::cmp::{max, min};
+use crate::server::systems::indexer::map_indexer;
+use crate::server::systems::turn_system::{turn_system, PendingMoves};
+use crate::server::systems::ai::monster_ai;
+use crate::map::Map;
+use crate::server::map_builders::factories::random_builder;
+use crate::server::map_builders::BuiltMap;
+use crate::server::gamestate::RunState;
+use instant::Instant;
 
 pub struct Server {
     pub(crate) world: World,
     pub(crate) resources: Resources,
     schedule: Schedule,
+    run_state: RunState,
+    map_state: MapState,
 }
+
+pub struct MapState {
+    mapgen_index: usize,
+    mapgen_built_map: BuiltMap,
+    mapgen_timer: Instant,
+}
+
 
 pub struct MessageQueue {
     messages: Vec<Message>,
@@ -48,17 +61,61 @@ impl Server {
 
     pub fn new() -> Self {
         let (mut universe, mut world, mut resources) = Self::setup_ecs();
-        let (map, position) = RoomMapBuilder::build((60, 30), 10);
-        resources.insert(map);
-        let mut command_buffer = CommandBuffer::new(&world);
-        for i in 1..100 {
-            generate_centipede(&mut command_buffer, i);
+        let mut rng = rand::thread_rng();
+        let built_map = random_builder((80, 43).into(), 10, &mut rng);
+        let BuiltMap {
+            spawn_list,
+            map,
+            starting_position,
+            rooms,
+            history,
+            with_history
+        } = &built_map;
+
+        let position = match starting_position {
+            Some(pos) => pos,
+            None => panic!("No starting position in map!"),
+        };
+        if *with_history {
+            resources.insert(history[0].clone())
+        } else {
+            resources.insert(map.clone());
         }
+
+        let schedule = Schedule::builder()
+            .add_system(map_indexer())
+            .add_system(turn_system())
+            .flush()
+            .add_system(monster_ai())
+            .flush()
+            .add_system(sweep())
+            .build();
+
+        Server {
+            world,
+            resources,
+            schedule,
+            run_state: RunState::MapGeneration,
+            map_state: MapState {
+                mapgen_index: 0,
+                mapgen_built_map: built_map,
+                mapgen_timer: Instant::now(),
+            }
+        }
+    }
+
+    fn insert_entities(&mut self) {
+        let mut command_buffer = CommandBuffer::new(&self.world);
+        let map = self.resources.get::<Map>().unwrap();
+        for i in 1..100 {
+            generate_centipede(&map, &mut command_buffer, i);
+        }
+        let position = self.map_state.mapgen_built_map.starting_position.unwrap().clone();
         command_buffer
             .start_entity()
             .with_component(component::Position {
-                x: position.0,
-                y: position.1,
+                x: position.x,
+                y: position.y,
             })
             .with_component(component::Renderable {
                 glyph: Glyph {
@@ -75,22 +132,7 @@ impl Server {
             .with_component(component::Priority { value: 100 })
             .with_component(component::TileBlocker)
             .build();
-        command_buffer.write(&mut world);
-
-        let schedule = Schedule::builder()
-            .add_system(map_indexer())
-            .add_system(turn_system())
-            .flush()
-            .add_system(monster_ai())
-            .flush()
-            .add_system(sweep())
-            .build();
-
-        Server {
-            world,
-            resources,
-            schedule,
-        }
+        command_buffer.write(&mut self.world);
     }
 
     pub fn messages(&mut self) -> Vec<Message> {
@@ -103,19 +145,44 @@ impl Server {
     }
 
     pub fn tick(&mut self) {
-        let world = &mut self.world;
-        let resources = &mut self.resources;
-        let schedule = &mut self.schedule;
-        let (sender, receiver) = crossbeam_channel::unbounded();
-        world.subscribe(sender, any());
+        match self.run_state {
+            RunState::Running => {
+                let world = &mut self.world;
+                let resources = &mut self.resources;
+                let schedule = &mut self.schedule;
+                schedule.execute(world, resources);
+            },
+            RunState::MapGeneration => {
+                if self.map_state.mapgen_timer.elapsed().as_millis() > 500 {
+                    let resources = &mut self.resources;
+                    self.map_state.mapgen_index += 1;
+                    if self.map_state.mapgen_index >= self.map_state.mapgen_built_map.history.len() {
+                        resources.insert(self.map_state.mapgen_built_map.map.clone());
+                        self.run_state = RunState::Initializing;
 
-        schedule.execute(world, resources);
-        for event in receiver.try_iter() {
-            println!("{:?}", event);
+                    } else {
+                        let index = self.map_state.mapgen_index;
+                        resources.insert(self.map_state.mapgen_built_map.history[index].clone());
+                        self.map_state.mapgen_timer = Instant::now();
+                    }
+                }
+            },
+            RunState::Initializing => {
+                let resources = &mut self.resources;
+                let mut map = resources.get_mut::<Map>().unwrap();
+                map.refresh_blocked();
+                std::mem::drop(map);
+                self.insert_entities();
+                self.run_state = RunState::Running;
+            },
+            _ => panic!("Unhandled runstate!")
         }
     }
 
     pub fn try_move_player(&mut self, delta_x: i32, delta_y: i32) -> bool {
+        if self.run_state != RunState::Running {
+            return false
+        }
         let world = &mut self.world;
         let resources = &mut self.resources;
         let mut message_queue = resources.get_mut::<MessageQueue>().unwrap();
@@ -130,8 +197,8 @@ impl Server {
         let mut killed = vec![];
         let mut moved = false;
         for (mut pos, _, mut turn) in query.iter_mut(world) {
-            let desired_x = min(map.size.0, max(0, pos.x + delta_x));
-            let desired_y = min(map.size.1, max(0, pos.y + delta_y));
+            let desired_x = min(map.size.x, max(0, pos.x + delta_x));
+            let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
             let coord = map.coord_to_index(desired_x, desired_y);
             if map.blocked[coord] {
@@ -181,10 +248,19 @@ impl Server {
     }
 }
 
-fn generate_centipede(buffer: &mut CommandBuffer, i: u32) {
+fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, i: u32) {
     let mut rng = rand::thread_rng();
-    let position_x = rng.gen_range(10, 50);
-    let position_y = rng.gen_range(10, 20);
+    let mut position_x;
+    let mut position_y;
+    let size = map.size.clone();
+    loop {
+        position_x = rng.gen_range(0, size.x - 1);
+        position_y = rng.gen_range(0, size.y - 1);
+        if !map.is_blocked((position_x, position_y).into()) {
+            break
+        }
+    };
+
     buffer
         .start_entity()
         .with_component(component::Position {

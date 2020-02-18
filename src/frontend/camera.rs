@@ -2,14 +2,15 @@ use crate::component;
 use crate::frontend::client::{Client, TileContext};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Rect, Vector};
-use crate::server::map::{Map, TileType};
+
 use legion::prelude::*;
 use quicksilver::graphics::{Color, Graphics};
+use crate::map::{TileType, Map};
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
 pub fn render_camera(client: &mut Client) {
     let (min_x, max_x, min_y, max_y) = get_screen_bounds(client);
-    let (map_width, map_height) = client.resources().get::<Map>().unwrap().size;
+    let (map_width, map_height) = client.resources().get::<Map>().unwrap().size.to_tuple();
     let map_region = client.map_region();
 
     for (y, ty) in (min_y..max_y).enumerate() {
