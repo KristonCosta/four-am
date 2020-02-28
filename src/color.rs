@@ -2,6 +2,12 @@ use quicksilver::graphics::Color;
 
 pub const BLACK: Color = Color::BLACK;
 pub const BLUE: Color = Color::BLUE;
+pub const GREY: Color = Color {
+    r: 0.5,
+    g: 0.5,
+    b: 0.5,
+    a: 1.0,
+};
 pub const RED: Color = Color {
     r: 0.9,
     g: 0.1,

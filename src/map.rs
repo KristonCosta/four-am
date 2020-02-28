@@ -1,5 +1,5 @@
 use crate::component::{Position, TileBlocker};
-use crate::geom::{Rect, Point, Vector};
+use crate::geom::{Point, Rect, Vector};
 use legion::prelude::*;
 use rand::Rng;
 use std::cmp::{max, min};
@@ -80,8 +80,8 @@ impl Map {
         ((y as usize) * self.size.x as usize) + x as usize
     }
 
-    fn point_to_index(&self, point: Point) -> usize {
-        ((point.y as usize ) * self.size.x as usize) + point.x as usize
+    pub fn point_to_index(&self, point: Point) -> usize {
+        ((point.y as usize) * self.size.x as usize) + point.x as usize
     }
 
     pub fn is_blocked(&self, point: Point) -> bool {
@@ -95,6 +95,22 @@ impl Map {
     pub fn set_type(&mut self, point: Point, t: TileType) {
         let index = self.point_to_index(point);
         self.tiles[index] = t
+    }
+
+    pub fn set_visible(&mut self, point: Point) {
+        let index = self.point_to_index(point);
+        self.visible_tiles[index] = true;
+    }
+
+    pub fn clear_visible(&mut self) {
+        for i in 0..self.tiles.len() {
+            self.visible_tiles[i] = false
+        }
+    }
+
+    pub fn set_revealed(&mut self, point: Point) {
+        let index = self.point_to_index(point);
+        self.revealed_tiles[index] = true;
     }
 
     pub fn refresh_blocked(&mut self) {

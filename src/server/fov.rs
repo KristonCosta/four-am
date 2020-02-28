@@ -1,7 +1,8 @@
-use std::collections::HashSet;
+use crate::geom::Point;
 use crate::map::Map;
+use std::collections::HashSet;
 
-pub fn calculate_fov(pos: (i32, i32), radius: u32, map: &Map) -> HashSet<(i32, i32)> {
+pub fn calculate_fov(pos: Point, radius: u32, map: &Map) -> HashSet<Point> {
     let mut set = HashSet::new();
     for i in 0..361 {
         calculate_fov_for_direction(
@@ -16,16 +17,16 @@ pub fn calculate_fov(pos: (i32, i32), radius: u32, map: &Map) -> HashSet<(i32, i
 }
 
 fn calculate_fov_for_direction(
-    pos: (i32, i32),
+    pos: Point,
     radius: u32,
     direction: (f32, f32),
     map: &Map,
-    set: &mut HashSet<(i32, i32)>,
+    set: &mut HashSet<Point>,
 ) {
-    let mut ox = (pos.0 as f32) + 0.5;
-    let mut oy = (pos.1 as f32) + 0.5;
+    let mut ox = (pos.x as f32) + 0.5;
+    let mut oy = (pos.y as f32) + 0.5;
     for _i in 0..radius {
-        set.insert((ox as i32, oy as i32));
+        set.insert((ox as i32, oy as i32).into());
         let coords = map.coord_to_index(ox as i32, oy as i32);
         if map.blocked[coords] {
             return;

@@ -1,4 +1,5 @@
 use quicksilver::graphics::Color;
+use crate::color::GREY;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Glyph {
@@ -15,6 +16,15 @@ impl Glyph {
             foreground,
             background,
             render_order: 0,
+        }
+    }
+
+    pub fn greyscale(&self) -> Self {
+        Glyph {
+            ch: self.ch,
+            foreground: Some(GREY),
+            background: None,
+            render_order: self.render_order
         }
     }
 }

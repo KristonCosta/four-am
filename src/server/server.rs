@@ -5,18 +5,19 @@ use crate::message::Message;
 use crate::resources::log::GameLog;
 use crate::{color, component};
 
+use crate::map::Map;
+use crate::server::gamestate::RunState;
+use crate::server::map_builders::factories::{drunk_builder, random_builder};
+use crate::server::map_builders::BuiltMap;
+use crate::server::systems::ai_system::ai_system;
+use crate::server::systems::index_system::index_system;
+use crate::server::systems::turn_system::{turn_system, PendingMoves};
+use instant::Instant;
 use legion::prelude::*;
 use quicksilver::graphics::Color;
 use rand::Rng;
 use std::cmp::{max, min};
-use crate::server::systems::indexer::map_indexer;
-use crate::server::systems::turn_system::{turn_system, PendingMoves};
-use crate::server::systems::ai::monster_ai;
-use crate::map::Map;
-use crate::server::map_builders::factories::{random_builder, drunk_builder};
-use crate::server::map_builders::BuiltMap;
-use crate::server::gamestate::RunState;
-use instant::Instant;
+use crate::server::systems::vision_system::vision_system;
 
 pub struct Server {
     pub(crate) world: World,
@@ -32,7 +33,6 @@ pub struct MapState {
     mapgen_built_map: BuiltMap,
     mapgen_timer: Instant,
 }
-
 
 pub struct MessageQueue {
     messages: Vec<Message>,
@@ -70,7 +70,7 @@ impl Server {
             starting_position,
             rooms,
             history,
-            with_history
+            with_history,
         } = &built_map;
 
         let position = match starting_position {
@@ -85,10 +85,11 @@ impl Server {
         }
 
         let schedule = Schedule::builder()
-            .add_system(map_indexer())
+            .add_system(index_system())
             .add_system(turn_system())
+            .add_system(vision_system())
             .flush()
-            .add_system(monster_ai())
+            .add_system(ai_system())
             .flush()
             .add_system(sweep())
             .build();
@@ -103,7 +104,7 @@ impl Server {
                 mapgen_index: 0,
                 mapgen_built_map: built_map,
                 mapgen_timer: Instant::now(),
-            }
+            },
         }
     }
 
@@ -117,7 +118,7 @@ impl Server {
             starting_position,
             rooms,
             history,
-            with_history
+            with_history,
         } = &built_map;
 
         let position = match starting_position {
@@ -130,11 +131,14 @@ impl Server {
         } else {
             self.resources.insert(map.clone());
         }
-        std::mem::swap(&mut self.map_state, &mut MapState {
-            mapgen_index: 0,
-            mapgen_built_map: built_map,
-            mapgen_timer: Instant::now(),
-        });
+        std::mem::swap(
+            &mut self.map_state,
+            &mut MapState {
+                mapgen_index: 0,
+                mapgen_built_map: built_map,
+                mapgen_timer: Instant::now(),
+            },
+        );
     }
 
     pub fn reload_drunken_world(&mut self) {
@@ -155,7 +159,12 @@ impl Server {
         for i in 1..100 {
             generate_centipede(&map, &mut command_buffer, i);
         }
-        let position = self.map_state.mapgen_built_map.starting_position.unwrap().clone();
+        let position = self
+            .map_state
+            .mapgen_built_map
+            .starting_position
+            .unwrap()
+            .clone();
         command_buffer
             .start_entity()
             .with_component(component::Position {
@@ -170,12 +179,18 @@ impl Server {
                     render_order: 3,
                 },
             })
-            .with_component(component::Player)
+            .with_component(component::FieldOfView {
+                visible_tiles: Vec::new(),
+                range: 8,
+                previous_position: (-1, -1).into(),
+            })
             .with_component(component::Name {
                 name: "Player".to_string(),
             })
             .with_component(component::Priority { value: 100 })
             .with_component(component::TileBlocker)
+            .with_tag(())
+            .with_tag(component::Player)
             .build();
         command_buffer.write(&mut self.world);
     }
@@ -196,22 +211,26 @@ impl Server {
                 let resources = &mut self.resources;
                 let schedule = &mut self.schedule;
                 schedule.execute(world, resources);
-            },
+            }
             RunState::MapGeneration => {
-                if self.map_state.mapgen_timer.elapsed().as_millis() > 200 {
+                if !self.map_state.mapgen_built_map.with_history {
+                    self.resources
+                        .insert(self.map_state.mapgen_built_map.map.clone());
+                    self.run_state = RunState::Initializing;
+                } else if self.map_state.mapgen_timer.elapsed().as_millis() > 200 {
                     let resources = &mut self.resources;
                     self.map_state.mapgen_index += 1;
-                    if self.map_state.mapgen_index >= self.map_state.mapgen_built_map.history.len() {
+                    if self.map_state.mapgen_index >= self.map_state.mapgen_built_map.history.len()
+                    {
                         resources.insert(self.map_state.mapgen_built_map.map.clone());
                         self.run_state = RunState::Initializing;
-
                     } else {
                         let index = self.map_state.mapgen_index;
                         resources.insert(self.map_state.mapgen_built_map.history[index].clone());
                         self.map_state.mapgen_timer = Instant::now();
                     }
                 }
-            },
+            }
             RunState::Initializing => {
                 let resources = &mut self.resources;
                 let mut map = resources.get_mut::<Map>().unwrap();
@@ -219,14 +238,14 @@ impl Server {
                 std::mem::drop(map);
                 self.insert_entities();
                 self.run_state = RunState::Running;
-            },
-            _ => panic!("Unhandled runstate!")
+            }
+            _ => panic!("Unhandled runstate!"),
         }
     }
 
     pub fn try_move_player(&mut self, delta_x: i32, delta_y: i32) -> bool {
         if self.run_state != RunState::Running {
-            return false
+            return false;
         }
         let world = &mut self.world;
         let resources = &mut self.resources;
@@ -234,14 +253,13 @@ impl Server {
         let mut map = resources.get_mut::<Map>().unwrap();
         let mut query = <(
             Write<component::Position>,
-            Write<component::Player>,
             Write<component::ActiveTurn>,
-        )>::query();
+        )>::query().filter(tag::<component::Player>());
 
         let mut command_buffer = CommandBuffer::new(&world);
         let mut killed = vec![];
         let mut moved = false;
-        for (mut pos, _, mut turn) in query.iter_mut(world) {
+        for (mut pos, mut turn) in query.iter_mut(world) {
             let desired_x = min(map.size.x, max(0, pos.x + delta_x));
             let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
@@ -281,10 +299,9 @@ impl Server {
         let resources = &mut self.resources;
         let mut query = <(
             Write<component::Position>,
-            Write<component::Player>,
             Write<component::ActiveTurn>,
-        )>::query();
-        for (mut pos, _, mut turn) in query.iter_mut(world) {
+        )>::query().filter(tag::<component::Player>());
+        for (mut pos, mut turn) in query.iter_mut(world) {
             pos.x = desired_pos.x;
             pos.y = desired_pos.y;
             turn.state = TurnState::DONE;
@@ -302,9 +319,9 @@ fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, i: u32) {
         position_x = rng.gen_range(0, size.x - 1);
         position_y = rng.gen_range(0, size.y - 1);
         if !map.is_blocked((position_x, position_y).into()) {
-            break
+            break;
         }
-    };
+    }
 
     buffer
         .start_entity()

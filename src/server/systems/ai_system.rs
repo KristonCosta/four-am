@@ -1,13 +1,13 @@
 use crate::component::{ActiveTurn, Killed, Monster, Name, Position, TurnState};
+use crate::map::Map;
 use crate::message::Message;
 use crate::server::server::MessageQueue;
 use legion::prelude::*;
 use quicksilver::graphics::Color;
 use rand::Rng;
 use std::cmp::{max, min};
-use crate::map::Map;
 
-pub fn monster_ai() -> Box<dyn Schedulable> {
+pub fn ai_system() -> Box<dyn Schedulable> {
     SystemBuilder::new("monster_ai")
         .read_component::<Name>()
         .write_resource::<MessageQueue>()

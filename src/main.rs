@@ -4,7 +4,6 @@ use quicksilver::graphics::Graphics;
 use quicksilver::lifecycle::{run, EventStream, Settings, Window};
 use quicksilver::Result;
 
-pub mod map;
 pub mod client;
 pub mod color;
 pub mod common;
@@ -12,6 +11,7 @@ pub mod component;
 pub mod error;
 pub mod frontend;
 pub mod geom;
+pub mod map;
 pub mod message;
 pub mod resources;
 pub mod server;

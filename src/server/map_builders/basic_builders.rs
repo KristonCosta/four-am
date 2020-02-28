@@ -1,9 +1,9 @@
-use crate::map::{Map, TileType};
 use crate::geom::Rect;
-use std::cmp::{min, max};
-use rand::Rng;
+use crate::map::{Map, TileType};
 use crate::server::map_builders::{BaseMapBuilder, BuiltMap};
 use rand::prelude::ThreadRng;
+use rand::Rng;
+use std::cmp::{max, min};
 
 pub struct RoomMapBuilder;
 
@@ -12,11 +12,11 @@ impl BaseMapBuilder for RoomMapBuilder {
         let size: (i32, i32) = build_data.map.size.to_tuple();
         let map = &mut build_data.map;
         create_room(
-             map,
+            map,
             &Rect::new((1, 1).into(), (size.0 - 2, size.1 - 2).into()),
         );
 
-        build_data.starting_position = Some((size.0/2, size.1/2).into());
+        build_data.starting_position = Some((size.0 / 2, size.1 / 2).into());
     }
 }
 
@@ -56,11 +56,31 @@ impl SimpleMapBuilder {
                     let center = new_room.center();
                     let prev = rooms[rooms.len() - 1].center();
                     if rng.gen_range(0, 2) == 1 {
-                        dig_horizontal(&mut build_data.map, prev.x as i32, center.x as i32, prev.y as i32);
-                        dig_vertical(&mut build_data.map, prev.y as i32, center.y as i32, center.x as i32);
+                        dig_horizontal(
+                            &mut build_data.map,
+                            prev.x as i32,
+                            center.x as i32,
+                            prev.y as i32,
+                        );
+                        dig_vertical(
+                            &mut build_data.map,
+                            prev.y as i32,
+                            center.y as i32,
+                            center.x as i32,
+                        );
                     } else {
-                        dig_horizontal(&mut build_data.map, prev.x as i32, center.x as i32, center.y as i32);
-                        dig_vertical(&mut build_data.map, prev.y as i32, center.y as i32, prev.x as i32);
+                        dig_horizontal(
+                            &mut build_data.map,
+                            prev.x as i32,
+                            center.x as i32,
+                            center.y as i32,
+                        );
+                        dig_vertical(
+                            &mut build_data.map,
+                            prev.y as i32,
+                            center.y as i32,
+                            prev.x as i32,
+                        );
                     }
                 }
                 rooms.push(new_room);

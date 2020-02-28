@@ -1,11 +1,11 @@
-use crate::geom::{Rect, Vector, Point};
-use rand::Rng;
+use crate::geom::{Point, Rect, Vector};
 use crate::map::Map;
 use rand::prelude::ThreadRng;
+use rand::Rng;
 
-pub mod factories;
 pub mod basic_builders;
 pub mod drunkard;
+pub mod factories;
 
 // Most of this taken from https://bfnightly.bracketproductions.com/rustbook/chapter_36.html
 pub trait BaseMapBuilder {
@@ -19,7 +19,7 @@ pub trait MetaMapBuilder {
 pub struct MapBuilder {
     base: Box<dyn BaseMapBuilder>,
     builders: Vec<Box<dyn MetaMapBuilder>>,
-    build_data: BuiltMap
+    build_data: BuiltMap,
 }
 
 impl MapBuilder {
@@ -27,12 +27,13 @@ impl MapBuilder {
         MapBuilder {
             base: Box::new(base),
             builders: vec![],
-            build_data: BuiltMap::new(size, depth)
+            build_data: BuiltMap::new(size, depth),
         }
     }
 
-    pub fn keep_history(&mut self) {
+    pub fn keep_history(mut self) -> Self {
         self.build_data.with_history = true;
+        self
     }
 
     pub fn with(mut self, builder: impl MetaMapBuilder + 'static) -> Self {
@@ -66,7 +67,7 @@ impl BuiltMap {
             starting_position: None,
             rooms: None,
             history: vec![],
-            with_history: false
+            with_history: false,
         }
     }
 }

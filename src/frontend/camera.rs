@@ -3,9 +3,9 @@ use crate::frontend::client::{Client, TileContext};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Rect, Vector};
 
+use crate::map::{Map, TileType};
 use legion::prelude::*;
 use quicksilver::graphics::{Color, Graphics};
-use crate::map::{TileType, Map};
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
 pub fn render_camera(client: &mut Client) {
@@ -29,30 +29,35 @@ pub fn render_camera(client: &mut Client) {
             let y = y + map_region.origin.y;
             if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
                 let map = client.network_client.resources().get::<Map>().unwrap();
+                let index = map.point_to_index((tx, ty).into());
+                if !map.revealed_tiles[index] {
+                    continue;
+                }
                 let tile = map
                     .tiles
                     .get((tx + ty * map_width) as usize)
                     .expect(&format!("Couldn't find {} {}", tx, ty));
 
-                match tile {
+                let glyph = match tile {
                     TileType::Wall => {
-                        client
-                            .render_context
-                            .draw(&Glyph::from('#', Some(Color::GREEN), None), (x, y));
-                    },
+                        Glyph::from('#', Some(Color::GREEN), None)
+                    }
                     TileType::Floor => {
-                        client.render_context.draw(
-                            &Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None),
-                            (x, y),
-                        );
-                    },
+                        Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None)
+
+                    }
                     TileType::Digging => {
-                        client.render_context.draw(
-                            &Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None),
-                            (x, y),
-                        );
-                    },
-                }
+                        Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None)
+                    }
+                };
+                let glyph = if map.visible_tiles[index] {
+                    glyph
+                } else {
+                    glyph.greyscale()
+                };
+                client
+                    .render_context
+                    .draw(&glyph, (x, y))
             } else {
                 client
                     .render_context
@@ -65,6 +70,7 @@ pub fn render_camera(client: &mut Client) {
     let world = client.network_client.world();
     let mut data = query.iter(world).collect::<Vec<_>>();
     data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
+    let map = client.network_client.resources().get::<Map>().unwrap();
     for (pos, render) in data.iter() {
         let x = pos.x - min_x - map_region.origin.x;
         let y = pos.y - min_y - map_region.origin.y;
@@ -73,7 +79,10 @@ pub fn render_camera(client: &mut Client) {
             && x < (map_region.origin.x + map_region.size.width)
             && y < (map_region.origin.y + map_region.size.height)
         {
-            client.render_context.draw(&render.glyph, (x, y));
+            let index = map.point_to_index((pos.x, pos.y).into());
+            if map.visible_tiles[index] {
+                client.render_context.draw(&render.glyph, (x, y));
+            }
         }
     }
 }

@@ -1,12 +1,20 @@
 use crate::frontend::glyph::Glyph;
 use crate::geom;
 use legion::prelude::World;
+use crate::geom::Point;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
 }
+
+impl Into<Point> for Position {
+    fn into(self) -> Point {
+        (self.x, self.y).into()
+    }
+}
+
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Renderable {
@@ -27,7 +35,8 @@ pub struct PickableTile;
 #[derive(Clone, Debug, PartialEq)]
 pub struct FieldOfView {
     pub visible_tiles: Vec<geom::Point>,
-    pub range: i32,
+    pub range: u32,
+    pub previous_position: Point
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

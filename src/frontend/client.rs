@@ -15,9 +15,10 @@ use crate::message::Message;
 use crate::resources::log::GameLog;
 
 use quicksilver::graphics::{Color, Graphics};
-use quicksilver::lifecycle::{ElementState, Event, EventStream, Key, Window};
+use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 
 use legion::prelude::*;
+use quicksilver::lifecycle::event::{KeyboardEvent, PointerInputEvent, PointerMovedEvent};
 
 pub struct RenderContext {
     map_region: Rect,
@@ -67,14 +68,15 @@ impl Client {
                 screen_size,
                 gfx,
                 mouse_position: (0, 0).into(),
-                focus: (x/2, y/2).into(),
+                focus: (x / 2, y / 2).into(),
             },
             network_client: NetworkClient::new(),
         }
     }
 
     pub fn sync(&mut self) {
-        let mut query = <(Read<component::Player>, Read<component::Position>)>::query();
+        let mut query = <(Read<component::Player>, Read<component::Position>)>::query()
+            .filter(tag::<component::Player>());
         for (_, position) in query.iter(self.network_client.world()) {
             self.render_context.focus = (position.x, position.y).into();
         }
@@ -97,25 +99,19 @@ impl Client {
 
     pub fn handle_event(&mut self, event: Event) -> bool {
         match event {
-            Event::KeyboardInput { key, state } => {
-                self.handle_key(key, state);
+            Event::KeyboardInput(event) => {
+                self.handle_key(event.key(), event.is_down());
                 true
             }
-            Event::MouseMoved {
-                pointer: _,
-                position,
-            } => {
+            Event::PointerMoved(event) => {
                 let scale = self.render_context.window.scale_factor();
-                self.render_context.mouse_position.x = position.x as i32 / scale as i32;
-                self.render_context.mouse_position.y = position.y as i32 / scale as i32;
+                let location = event.location();
+                self.render_context.mouse_position.x = location.x as i32; // / scale as i32;
+                self.render_context.mouse_position.y = location.y as i32; // / scale as i32;
                 false
             }
-            Event::MouseInput {
-                pointer: _,
-                state,
-                button: _,
-            } => {
-                if state == ElementState::Pressed {
+            Event::PointerInput(event) => {
+                if event.is_down() {
                     let pos = self
                         .render_context
                         .tile_ctx
@@ -123,14 +119,14 @@ impl Client {
                         .point_to_grid(self.render_context.mouse_position);
                     self.handle_click(pos);
                 }
-                state == ElementState::Pressed
+                event.is_down()
             }
             _ => false,
         }
     }
 
-    pub fn handle_key(&mut self, key: Key, state: ElementState) {
-        if state == ElementState::Pressed {
+    pub fn handle_key(&mut self, key: Key, is_down: bool) {
+        if is_down {
             match key {
                 Key::W => self.handle_move((0, -1)),
                 Key::A => self.handle_move((-1, 0)),
@@ -142,6 +138,7 @@ impl Client {
                 Key::Right => self.handle_focus((1, 0)),
                 Key::Q => self.network_client.reload_world(WorldType::Drunken),
                 Key::E => self.network_client.reload_world(WorldType::Room),
+                Key::C => self.sync(),
                 _ => {}
             }
         }

@@ -46,6 +46,5 @@ impl NetworkClient {
             WorldType::Drunken => self.server.as_mut().unwrap().reload_drunken_world(),
             WorldType::Room => self.server.as_mut().unwrap().reload_room_world(),
         }
-
     }
 }

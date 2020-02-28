@@ -1,7 +1,7 @@
+use crate::geom::Point;
+use crate::map::TileType;
 use crate::server::map_builders::{BaseMapBuilder, BuiltMap};
 use rand::prelude::ThreadRng;
-use crate::map::TileType;
-use crate::geom::Point;
 use rand::Rng;
 
 pub struct DrunkardsWalkBuilder {
@@ -16,13 +16,22 @@ impl BaseMapBuilder for DrunkardsWalkBuilder {
         let total_tiles = build_data.map.size.x * build_data.map.size.y;
         let desired_floor = (self.floor_percent * total_tiles as f32) as usize;
         let mut digger_count = 0;
-        let mut floor_tile_count = build_data.map.tiles.iter().filter(|tile| **tile == TileType::Floor).count();
+        let mut floor_tile_count = build_data
+            .map
+            .tiles
+            .iter()
+            .filter(|tile| **tile == TileType::Floor)
+            .count();
         build_data.starting_position = Some(starting_position.clone());
         while floor_tile_count < desired_floor {
             let mut did_something = false;
             let mut position = match digger_count {
-              0 => starting_position.clone(),
-              _ => (rng.gen_range(1, build_data.map.size.x - 3) + 1, rng.gen_range(1, build_data.map.size.y - 3) + 1).into(),
+                0 => starting_position.clone(),
+                _ => (
+                    rng.gen_range(1, build_data.map.size.x - 3) + 1,
+                    rng.gen_range(1, build_data.map.size.y - 3) + 1,
+                )
+                    .into(),
             };
             let mut current_life = self.lifetime;
             while current_life > 0 {
@@ -32,10 +41,26 @@ impl BaseMapBuilder for DrunkardsWalkBuilder {
                 build_data.map.set_type(position, TileType::Digging);
                 let stagger = rng.gen_range(0, 4);
                 match stagger {
-                    0 => {if position.x > 1 { position.x -= 1 }},
-                    1 => {if position.x < build_data.map.size.x - 2 { position.x += 1 }},
-                    2 => {if position.y > 1 { position.y -= 1 }},
-                    _ => {if position.y < build_data.map.size.y - 2 { position.y += 1 }},
+                    0 => {
+                        if position.x > 1 {
+                            position.x -= 1
+                        }
+                    }
+                    1 => {
+                        if position.x < build_data.map.size.x - 2 {
+                            position.x += 1
+                        }
+                    }
+                    2 => {
+                        if position.y > 1 {
+                            position.y -= 1
+                        }
+                    }
+                    _ => {
+                        if position.y < build_data.map.size.y - 2 {
+                            position.y += 1
+                        }
+                    }
                 }
                 current_life -= 1;
             }
@@ -49,11 +74,14 @@ impl BaseMapBuilder for DrunkardsWalkBuilder {
                     *t = TileType::Floor;
                 }
             }
-            floor_tile_count = build_data.map.tiles.iter().filter(|tile| **tile == TileType::Floor).count();
+            floor_tile_count = build_data
+                .map
+                .tiles
+                .iter()
+                .filter(|tile| **tile == TileType::Floor)
+                .count();
         }
     }
 }
 
-impl DrunkardsWalkBuilder {
-
-}
+impl DrunkardsWalkBuilder {}
