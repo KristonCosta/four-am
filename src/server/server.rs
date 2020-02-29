@@ -278,18 +278,18 @@ impl Server {
                 ));
             } else if let Some(entity) = map.tile_content[coord] {
                 killed.push(entity);
-                command_buffer.add_component(entity, Killed);
+                command_buffer.add_component(entity, Hurt);
             } else {
                 pos.x = desired_x;
                 pos.y = desired_y;
-                turn.state = TurnState::DONE;
                 moved = true;
             }
+            turn.state = TurnState::DONE;
         }
         for entity in killed {
             let name = world.get_component::<Name>(entity).unwrap();
             message_queue.push(Message::GameEvent(
-                format!("Ouch, you killed {}", name.name),
+                format!("Ouch, you hurt {}", name.name),
                 Some(Color::RED),
                 None,
             ));
@@ -343,6 +343,10 @@ fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, i: u32) {
                 background: None,
                 render_order: 3,
             },
+        })
+        .with_component(component::Health {
+            current: 3,
+            max: 3,
         })
         .with_component(component::Name {
             name: format!("Giant Centipede {}", i),

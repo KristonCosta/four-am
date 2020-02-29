@@ -5,7 +5,7 @@ use crate::geom::{Point, Rect};
 use quicksilver::graphics::{Color, Graphics};
 use crate::color::{RED, BLACK};
 use legion::prelude::*;
-use crate::component::{Health, Player};
+use crate::component::{Health, Player, Name};
 
 pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
     draw_box(
@@ -41,6 +41,22 @@ pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
         print(render_context, health_string.as_str(), (50, 1), None, None);
         draw_bar_horizontal(render_context, (64, 1).into(), 14, health.current as u32, health.max, RED, BLACK);
         break;
+    }
+
+    let mut name: Option<Name> = None;
+    let mut health: Option<Health> = None;
+    if let Some(targeted) = render_context.targeted_entity {
+        name = world.get_component::<Name>(targeted).map(|x| (*x).clone());
+        health = world.get_component::<Health>(targeted).map(|x| *x);
+    }
+
+    if let Some(name) = name {
+        print(render_context, name.name.as_str(), (50, 9), None, None);
+    }
+    if let Some(health) = health {
+        let health_string = format!("Health: {}/{}", health.current, health.max);
+        print(render_context, health_string.as_str(), (50, 10), None, None);
+        draw_bar_horizontal(render_context, (64, 10).into(), 14, health.current as u32, health.max, RED, BLACK);
     }
 }
 

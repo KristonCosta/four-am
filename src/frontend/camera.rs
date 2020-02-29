@@ -89,7 +89,7 @@ pub fn render_camera(client: &mut Client) {
 
 pub fn get_screen_bounds(client: &Client) -> (i32, i32, i32, i32) {
     let focus = client.focus();
-    let (x_chars, y_chars) = client.tile_context().grid.size.to_tuple();
+    let (x_chars, y_chars) = client.map_region().size.to_tuple();   //.grid.size.to_tuple();
 
     let center_x = x_chars / 2;
     let center_y = y_chars / 2;

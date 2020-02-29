@@ -25,6 +25,7 @@ pub struct RenderContext {
     tile_ctx: TileContext,
     screen_size: Vector,
     mouse_position: Vector,
+    pub(crate) targeted_entity: Option<Entity>,
     focus: Vector,
     gfx: Graphics,
     window: Window,
@@ -67,6 +68,7 @@ impl Client {
                 tile_ctx,
                 screen_size,
                 gfx,
+                targeted_entity: None,
                 mouse_position: (0, 0).into(),
                 focus: (x / 2, y / 2).into(),
             },
@@ -166,14 +168,20 @@ impl Client {
         )
             .into();
         let mut query = <(Read<component::Name>, Read<component::Position>)>::query();
-        for (name, position) in query.iter(self.network_client.world()) {
+        let mut found = false;
+        for (entity, (name, position)) in query.iter_entities(self.network_client.world()) {
             if position.x == point.x && position.y == point.y {
+                self.render_context.targeted_entity = Some(entity.clone());
                 self.log.push(
                     &format!("You clicked on {}", name.name),
                     Some(Color::GREEN),
                     None,
                 );
+                found = true;
             }
+        }
+        if !found {
+            self.render_context.targeted_entity = None;
         }
     }
 
