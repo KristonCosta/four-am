@@ -19,7 +19,7 @@ pub mod server;
 fn main() {
     run(
         Settings {
-            size: quicksilver::geom::Vector::new(800.0, 600.0).into(),
+            size: quicksilver::geom::Vector::new(1200.0, 900.0).into(),
             title: "Whoa",
             vsync: true,
             ..Settings::default()

@@ -1,4 +1,3 @@
-use crate::frontend::camera::get_screen_bounds;
 use crate::frontend::camera::render_camera;
 use crate::frontend::glyph::Glyph;
 use crate::frontend::grid::Grid;
@@ -20,13 +19,49 @@ use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 use legion::prelude::*;
 use quicksilver::lifecycle::event::{KeyboardEvent, PointerInputEvent, PointerMovedEvent};
 
+pub struct MapRegion {
+    pub(crate) region: Rect,
+    focus: Point,
+}
+
+impl MapRegion {
+    pub fn project(&self, point: Point) -> Point {
+        let (min_x, max_x, min_y, max_y) = self.get_screen_bounds();
+        let x = point.x - min_x + self.region.origin.x;
+        let y = point.y - min_y + self.region.origin.y;
+        (x, y).into()
+    }
+
+    pub fn unproject(&self, point: Point) -> Point {
+        let (min_x, max_x, min_y, max_y) = self.get_screen_bounds();
+        let x = point.x + min_x - self.region.origin.x;
+        let y = point.y + min_y - self.region.origin.y;
+        (x, y).into()
+    }
+
+    pub fn get_screen_bounds(&self) -> (i32, i32, i32, i32) {
+        let focus = self.focus;
+        let (x_chars, y_chars) = self.region.size.to_tuple();   //.grid.size.to_tuple();
+
+        let center_x = x_chars / 2;
+        let center_y = y_chars / 2;
+
+        let min_x = focus.x - center_x;
+        let max_x = min_x + x_chars;
+
+        let min_y = focus.y - center_y;
+        let max_y = min_y + y_chars;
+        (min_x, max_x, min_y, max_y)
+    }
+
+}
+
 pub struct RenderContext {
-    map_region: Rect,
+    map_region: MapRegion,
     tile_ctx: TileContext,
     screen_size: Vector,
     mouse_position: Vector,
     pub(crate) targeted_entity: Option<Entity>,
-    focus: Vector,
     gfx: Graphics,
     window: Window,
 }
@@ -55,22 +90,24 @@ impl Client {
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
             .await
             .expect("oof");
-        let grid = grid::Grid::from_screen_size((x, y), (800, 600));
+        let grid = grid::Grid::from_screen_size((x, y), (1200, 900));
         let screen_size = Vector::new(x, y);
         let tile_ctx = TileContext { tileset, grid };
-        let map_region = Rect::new((0, 0).into(), (48, 44).into());
+        let map_region = Rect::new((1, 1).into(), (48, 44).into());
         Client {
             events,
             log: GameLog::with_length(5),
             render_context: RenderContext {
                 window,
-                map_region,
+                map_region: MapRegion {
+                    region: map_region,
+                    focus: (x / 2, y / 2).into()
+                },
                 tile_ctx,
                 screen_size,
                 gfx,
                 targeted_entity: None,
-                mouse_position: (0, 0).into(),
-                focus: (x / 2, y / 2).into(),
+                mouse_position: (0, 0).into()
             },
             network_client: NetworkClient::new(),
         }
@@ -82,7 +119,7 @@ impl Client {
         println!("Syncing");
         for (position) in query.iter(self.network_client.world()) {
             println!("Found player");
-            self.render_context.focus = (position.x, position.y).into();
+            self.render_context.map_region.focus = (position.x, position.y).into();
         }
     }
 
@@ -149,24 +186,18 @@ impl Client {
     }
 
     pub fn handle_focus(&mut self, delta: impl Into<Vector>) {
-        self.render_context.focus += delta.into();
+        self.render_context.map_region.focus += delta.into();
     }
 
     pub fn handle_move(&mut self, delta: impl Into<Vector>) {
         let delta = delta.into();
         if self.network_client.try_move_player(delta) {
-            self.render_context.focus += delta;
+            self.render_context.map_region.focus += delta;
         }
     }
 
     pub fn handle_click(&mut self, point: impl Into<Point>) {
-        let point = point.into();
-        let (min_x, _max_x, min_y, _max_y) = get_screen_bounds(self);
-        let point: Point = (
-            point.x + min_x + self.render_context.map_region.origin.x,
-            point.y + min_y + self.render_context.map_region.origin.y,
-        )
-            .into();
+        let point = self.map_region().unproject(point.into());
         let mut query = <(Read<component::Name>, Read<component::Position>)>::query();
         let mut found = false;
         for (entity, (name, position)) in query.iter_entities(self.network_client.world()) {
@@ -203,8 +234,8 @@ impl Client {
         self.render_context.show();
     }
 
-    pub fn focus(&self) -> Vector {
-        self.render_context.focus
+    pub fn focus(&self) -> Point {
+        self.render_context.map_region.focus
     }
 
     pub fn mouse_position(&self) -> Vector {
@@ -215,8 +246,8 @@ impl Client {
         self.network_client.resources()
     }
 
-    pub fn map_region(&self) -> Rect {
-        self.render_context.map_region
+    pub fn map_region(&self) -> &MapRegion {
+        &self.render_context.map_region
     }
 
     pub fn tile_context(&self) -> &TileContext {
