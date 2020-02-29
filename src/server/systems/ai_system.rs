@@ -1,4 +1,4 @@
-use crate::component::{ActiveTurn, Killed, Monster, Name, Position, TurnState};
+use crate::component::{ActiveTurn, Killed, Monster, Name, Position, TurnState, Hurt};
 use crate::map::Map;
 use crate::message::Message;
 use crate::server::server::MessageQueue;
@@ -40,7 +40,7 @@ pub fn ai_system() -> Box<dyn Schedulable> {
                     ));
                 } else if let Some(other_entity) = map.tile_content[coord] {
                     killed.push((entity, other_entity));
-                    command_buffer.add_component(other_entity, Killed);
+                    command_buffer.add_component(other_entity, Hurt);
                 } else {
                     pos.x = desired_x;
                     pos.y = desired_y;
@@ -51,7 +51,7 @@ pub fn ai_system() -> Box<dyn Schedulable> {
                 let name = world.get_component::<Name>(entity).unwrap();
                 let other_name = world.get_component::<Name>(entity).unwrap();
                 queue.push(Message::GameEvent(
-                    format!("Ouch, {} killed {}", name.name, other_name.name),
+                    format!("Ouch, {} hurt {}", name.name, other_name.name),
                     Some(Color::RED),
                     None,
                 ));

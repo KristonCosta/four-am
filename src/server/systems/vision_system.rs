@@ -18,7 +18,7 @@ pub fn vision_system() -> Box<dyn Schedulable> {
                 fov.visible_tiles.clear();
                 let mut visible_tiles = calculate_fov(position, fov.range, map);
                 visible_tiles.retain(|&tile| {
-                    tile.x > 0 && tile.x < map.size.x - 1 && tile.y > 0 && tile.y < map.size.y - 1
+                    tile.x >= 0 && tile.x < map.size.x && tile.y >= 0 && tile.y < map.size.y
                 });
                 fov.visible_tiles = visible_tiles.drain().collect::<Vec<Point>>();
                 fov.previous_position = position;

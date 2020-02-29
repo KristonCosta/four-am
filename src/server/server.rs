@@ -1,4 +1,4 @@
-use crate::component::{Killed, Name, Position, TurnState};
+use crate::component::{Killed, Name, Position, TurnState, Hurt, Health};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Vector};
 use crate::message::Message;
@@ -90,6 +90,8 @@ impl Server {
             .add_system(vision_system())
             .flush()
             .add_system(ai_system())
+            .flush()
+            .add_system(damage_resolution())
             .flush()
             .add_system(sweep())
             .build();
@@ -186,6 +188,10 @@ impl Server {
             })
             .with_component(component::Name {
                 name: "Player".to_string(),
+            })
+            .with_component(component::Health {
+                current: 10,
+                max: 10,
             })
             .with_component(component::Priority { value: 100 })
             .with_component(component::TileBlocker)
@@ -301,6 +307,7 @@ impl Server {
             Write<component::Position>,
             Write<component::ActiveTurn>,
         )>::query().filter(tag::<component::Player>());
+
         for (mut pos, mut turn) in query.iter_mut(world) {
             pos.x = desired_pos.x;
             pos.y = desired_pos.y;
@@ -359,6 +366,22 @@ pub fn generate_blood(buffer: &mut CommandBuffer, pos: Vector) {
             },
         })
         .build();
+}
+
+pub fn damage_resolution() -> Box<dyn Schedulable> {
+    SystemBuilder::new("damage_system")
+        .with_query(<(Read<Hurt>, Write<Health>)>::query())
+        .build(move |command_buffer, mut world, _, query| {
+            for (entity, (_, mut health)) in query.iter_entities_mut(&mut world) {
+                println!("Running damage resolution");
+                health.current -= 1;
+                if health.current <= 0 {
+                    health.current = 0;
+                    command_buffer.add_component(entity, Killed);
+                }
+                command_buffer.remove_component::<Hurt>(entity);
+            }
+        })
 }
 
 pub fn sweep() -> Box<dyn Schedulable> {

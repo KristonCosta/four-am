@@ -24,6 +24,13 @@ pub struct Renderable {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Player;
 
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Health {
+    pub current: u32,
+    pub max: u32,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Name {
     pub name: String,
@@ -59,6 +66,9 @@ pub struct TileBlocker;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Killed;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Hurt;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Priority {

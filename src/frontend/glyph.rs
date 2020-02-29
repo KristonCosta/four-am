@@ -22,7 +22,7 @@ impl Glyph {
     pub fn greyscale(&self) -> Self {
         Glyph {
             ch: self.ch,
-            foreground: Some(GREY),
+            foreground: Some(GREY.with_alpha(0.5)),
             background: None,
             render_order: self.render_order
         }

@@ -3,7 +3,7 @@ use crate::frontend::camera::render_camera;
 use crate::frontend::glyph::Glyph;
 use crate::frontend::grid::Grid;
 use crate::frontend::tileset::Tileset;
-use crate::frontend::ui::{draw_box, print_glyphs};
+use crate::frontend::ui::{draw_box, print_glyphs, draw_ui};
 use crate::frontend::{grid, tileset};
 use crate::geom::{Point, Rect, Vector};
 use legion::systems::resource::Fetch;
@@ -50,14 +50,14 @@ pub struct Client {
 impl Client {
     pub async fn new(window: Window, mut gfx: Graphics, mut events: EventStream) -> Self {
         let x = 80;
-        let y = 50;
+        let y = 60;
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
             .await
             .expect("oof");
         let grid = grid::Grid::from_screen_size((x, y), (800, 600));
         let screen_size = Vector::new(x, y);
         let tile_ctx = TileContext { tileset, grid };
-        let map_region = Rect::new((0, 0).into(), (x, y - 8).into());
+        let map_region = Rect::new((0, 0).into(), (48, 44).into());
         Client {
             events,
             log: GameLog::with_length(5),
@@ -75,9 +75,11 @@ impl Client {
     }
 
     pub fn sync(&mut self) {
-        let mut query = <(Read<component::Player>, Read<component::Position>)>::query()
+        let mut query = <(Read<component::Position>)>::query()
             .filter(tag::<component::Player>());
-        for (_, position) in query.iter(self.network_client.world()) {
+        println!("Syncing");
+        for (position) in query.iter(self.network_client.world()) {
+            println!("Found player");
             self.render_context.focus = (position.x, position.y).into();
         }
     }
@@ -178,12 +180,8 @@ impl Client {
     pub fn render(&mut self) {
         let (x, y) = self.render_context.screen_size.to_tuple();
         self.render_context.gfx.clear(Color::BLACK);
-        draw_box(
-            &mut self.render_context,
-            Rect::new((0, y - 7).into(), (x - 1, 6).into()),
-            None,
-            None,
-        );
+        draw_ui(&mut self.render_context, &self.network_client.world());
+
         for (index, glyphs) in self.log.iter().enumerate() {
             print_glyphs(
                 &mut self.render_context,

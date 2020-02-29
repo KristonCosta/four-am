@@ -3,6 +3,66 @@ use crate::frontend::glyph::Glyph;
 
 use crate::geom::{Point, Rect};
 use quicksilver::graphics::{Color, Graphics};
+use crate::color::{RED, BLACK};
+use legion::prelude::*;
+use crate::component::{Health, Player};
+
+pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
+    draw_box(
+         render_context,
+        Rect::new((0, 0).into(), (49, 45).into()),
+        None,
+        None,
+    );
+    draw_box(
+        render_context,
+        Rect::new((0, 0).into(), (79, 59).into()),
+        None,
+        None,
+    );
+    draw_box(
+        render_context,
+        Rect::new((0, 45).into(), (79, 14).into()),
+        None,
+        None,
+    );
+    draw_box(
+        render_context,
+        Rect::new((49, 0).into(), (30, 8).into()),
+        None,
+        None,
+    );
+    let mut query = <(
+        Read<Health>
+    )>::query().filter(tag::<Player>());
+
+    for (health) in query.iter(world) {
+        let health_string = format!("Health: {}/{}", health.current, health.max);
+        print(render_context, health_string.as_str(), (50, 1), None, None);
+        draw_bar_horizontal(render_context, (64, 1).into(), 14, health.current as u32, health.max, RED, BLACK);
+        break;
+    }
+}
+
+pub fn draw_bar_horizontal(
+    render_context: &mut RenderContext,
+    position: Point,
+    width: u32,
+    current_value: u32,
+    max_value: u32,
+    fg: Color,
+    bg: Color) {
+    let fill = ((current_value as f32) / (max_value as f32) * (width as f32)) as u32;
+    let filled_glyph = Glyph::from('█', Some(fg), Some(bg));
+    let empty_glyph = Glyph::from('░', Some(fg), Some(bg));
+    for i in 0..width {
+        if i > fill {
+            render_context.draw(&empty_glyph, (position.x + i as i32, position.y));
+        } else {
+            render_context.draw(&filled_glyph, (position.x + i as i32, position.y));
+        }
+    }
+}
 
 pub fn draw_box(
     render_context: &mut RenderContext,
