@@ -32,16 +32,10 @@ pub fn ai_system() -> Box<dyn Schedulable> {
                 let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
                 let coord = map.coord_to_index(desired_x, desired_y);
-                if map.blocked[coord] {
-                    queue.push(Message::GameEvent(
-                        format!("Da {} hit a wall!", name.name),
-                        Some(Color::RED),
-                        None,
-                    ));
-                } else if let Some(other_entity) = map.tile_content[coord] {
+                if let Some(other_entity) = map.tile_content[coord] {
                     killed.push((entity, other_entity));
                     command_buffer.add_component(other_entity, Hurt);
-                } else {
+                } else if !map.blocked[coord] {
                     pos.x = desired_x;
                     pos.y = desired_y;
                 }

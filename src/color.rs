@@ -14,6 +14,7 @@ pub const RED: Color = Color {
     b: 0.1,
     a: 1.0,
 };
+
 pub const TAN: Color = Color {
     r: 232.0 / 255.0,
     g: 166.0 / 255.0,

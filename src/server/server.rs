@@ -1,4 +1,4 @@
-use crate::component::{Killed, Name, Position, TurnState, Hurt, Health};
+use crate::component::{Killed, Name, Position, TurnState, Hurt};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Vector};
 use crate::message::Message;
@@ -18,15 +18,57 @@ use quicksilver::graphics::Color;
 use rand::Rng;
 use std::cmp::{max, min};
 use crate::server::systems::vision_system::vision_system;
+use quicksilver::load_file;
+use serde::{Deserialize};
+
 
 pub struct Server {
     pub(crate) world: World,
     pub(crate) resources: Resources,
     pub(crate) universe: Universe,
+    pub(crate) data: Data,
     schedule: Schedule,
     run_state: RunState,
     map_state: MapState,
 }
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Data {
+    pub mobs: Vec<Monster>
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Monster {
+    pub name: String,
+    pub renderable: Renderable,
+    pub health: Health,
+    pub priority: Priority
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Renderable {
+    pub glyph: GlyphData
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct GlyphData {
+    pub ch: char,
+    pub foreground: Option<String>,
+    pub background: Option<String>,
+    pub render_order: u32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Health {
+    pub current: u32,
+    pub max: u32,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct Priority {
+    pub value: u32,
+}
+
 
 pub struct MapState {
     mapgen_index: usize,
@@ -60,7 +102,7 @@ impl Server {
         (universe, world, resources)
     }
 
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let (mut universe, mut world, mut resources) = Self::setup_ecs();
         let mut rng = rand::thread_rng();
         let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
@@ -72,6 +114,7 @@ impl Server {
             history,
             with_history,
         } = &built_map;
+
 
         let position = match starting_position {
             Some(pos) => pos,
@@ -101,6 +144,7 @@ impl Server {
             resources,
             schedule,
             universe,
+            data: Server::load_resources().await,
             run_state: RunState::MapGeneration,
             map_state: MapState {
                 mapgen_index: 0,
@@ -108,6 +152,12 @@ impl Server {
                 mapgen_timer: Instant::now(),
             },
         }
+    }
+
+    async fn load_resources() -> Data {
+        let file_contents = load_file("data/monsters.json").await.expect("ahh");
+        let raw_string = std::str::from_utf8(&file_contents).expect("Ono");
+        serde_json::from_str(raw_string).expect("oooof")
     }
 
     fn reload_world(&mut self, built_map: BuiltMap) {
@@ -159,7 +209,7 @@ impl Server {
         let mut command_buffer = CommandBuffer::new(&self.world);
         let map = self.resources.get::<Map>().unwrap();
         for i in 1..100 {
-            generate_centipede(&map, &mut command_buffer, i);
+            generate_centipede(&map, &mut command_buffer, &self.data, i);
         }
         let position = self
             .map_state
@@ -265,20 +315,23 @@ impl Server {
         let mut command_buffer = CommandBuffer::new(&world);
         let mut killed = vec![];
         let mut moved = false;
-        for (mut pos, mut turn) in query.iter_mut(world) {
+        for (entity, (mut pos, mut turn)) in query.iter_entities_mut(world) {
             let desired_x = min(map.size.x, max(0, pos.x + delta_x));
             let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
             let coord = map.coord_to_index(desired_x, desired_y);
+            println!("{:?}{:?}", desired_x, desired_y);
             if map.blocked[coord] {
                 message_queue.push(Message::GameEvent(
                     format!("Ouch, you hit a wall!"),
                     Some(Color::RED),
                     None,
                 ));
-            } else if let Some(entity) = map.tile_content[coord] {
-                killed.push(entity);
-                command_buffer.add_component(entity, Hurt);
+            } else if let Some(other) = map.tile_content[coord] {
+                if entity != other {
+                    killed.push(other);
+                    command_buffer.add_component(other, Hurt);
+                }
             } else {
                 pos.x = desired_x;
                 pos.y = desired_y;
@@ -298,26 +351,38 @@ impl Server {
         command_buffer.write(world);
         moved
     }
-
-    pub fn move_player(&mut self, desired_pos: impl Into<Point>) {
-        let desired_pos = desired_pos.into();
-        let world = &mut self.world;
-        let resources = &mut self.resources;
-        let mut query = <(
-            Write<component::Position>,
-            Write<component::ActiveTurn>,
-        )>::query().filter(tag::<component::Player>());
-
-        for (mut pos, mut turn) in query.iter_mut(world) {
-            pos.x = desired_pos.x;
-            pos.y = desired_pos.y;
-            turn.state = TurnState::DONE;
-            break;
-        }
-    }
 }
 
-fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, i: u32) {
+fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Point) {
+    let entity = buffer.start_entity()
+        .with_component(component::Position {
+            x: position.x,
+            y: position.y,
+        })
+        .with_component(component::Renderable {
+            glyph: Glyph {
+                ch: monster.renderable.glyph.ch,
+                foreground: monster.renderable.glyph.foreground.as_ref().map(|color| Color::from_hex(&color)) ,
+                background: None,
+                render_order: monster.renderable.glyph.render_order as i32,
+            },
+        })
+        .with_component(component::Health {
+            current: monster.health.current,
+            max: monster.health.max,
+        })
+        .with_component(component::Name {
+            name: monster.name.clone(),
+        })
+        .with_component(component::Priority { value: monster.priority.value as u8 })
+        .with_component(component::TileBlocker)
+        .with_component(component::Monster)
+        .build();
+}
+
+fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, data: &Data, i: u32) {
+
+
     let mut rng = rand::thread_rng();
     let mut position_x;
     let mut position_y;
@@ -329,32 +394,7 @@ fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, i: u32) {
             break;
         }
     }
-
-    buffer
-        .start_entity()
-        .with_component(component::Position {
-            x: position_x,
-            y: position_y,
-        })
-        .with_component(component::Renderable {
-            glyph: Glyph {
-                ch: 'C',
-                foreground: Some(color::TAN),
-                background: None,
-                render_order: 3,
-            },
-        })
-        .with_component(component::Health {
-            current: 3,
-            max: 3,
-        })
-        .with_component(component::Name {
-            name: format!("Giant Centipede {}", i),
-        })
-        .with_component(component::Priority { value: 1 })
-        .with_component(component::TileBlocker)
-        .with_component(component::Monster)
-        .build();
+    generate_monster(buffer, &data.mobs[0], (position_x, position_y).into())
 }
 
 pub fn generate_blood(buffer: &mut CommandBuffer, pos: Vector) {
@@ -374,7 +414,7 @@ pub fn generate_blood(buffer: &mut CommandBuffer, pos: Vector) {
 
 pub fn damage_resolution() -> Box<dyn Schedulable> {
     SystemBuilder::new("damage_system")
-        .with_query(<(Read<Hurt>, Write<Health>)>::query())
+        .with_query(<(Read<Hurt>, Write<component::Health>)>::query())
         .build(move |command_buffer, mut world, _, query| {
             for (entity, (_, mut health)) in query.iter_entities_mut(&mut world) {
                 println!("Running damage resolution");

@@ -29,7 +29,7 @@ fn main() {
 }
 
 type FP = f32;
-const MS_PER_UPDATE: FP = 1.0;
+const MS_PER_UPDATE: FP = 0.5;
 
 #[derive(Debug)]
 pub struct TimeStep {
@@ -79,7 +79,7 @@ async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Resu
     let mut timestep = TimeStep::new();
     let mut lag: f32 = 0.0;
     let mut turns = 0;
-    let mut server = Server::new();
+    let mut server = Server::new().await;
     let mut client = frontend::client::Client::new(window, gfx, events).await;
     client.network_client.bind(server);
     client.sync();

@@ -180,10 +180,12 @@ impl Client {
                 Key::Q => self.network_client.reload_world(WorldType::Drunken),
                 Key::E => self.network_client.reload_world(WorldType::Room),
                 Key::C => self.sync(),
+                Key::Space => self.handle_move((0, 0)),
                 _ => {}
             }
         }
     }
+
 
     pub fn handle_focus(&mut self, delta: impl Into<Vector>) {
         self.render_context.map_region.focus += delta.into();
