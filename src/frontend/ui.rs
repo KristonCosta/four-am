@@ -7,6 +7,8 @@ use crate::color::{RED, BLACK};
 use legion::prelude::*;
 use crate::component::{Health, Player, Name};
 
+const VERSION: &str = "1.1.1";
+
 pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
     draw_box(
          render_context,
@@ -56,6 +58,8 @@ pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
         print(render_context, health_string.as_str(), (50, 10), None, None);
         draw_bar_horizontal(render_context, (64, 10).into(), 14, health.current as u32, health.max, RED, BLACK);
     }
+
+    print(render_context, VERSION, (1, 46), None, None);
 }
 
 pub fn draw_bar_horizontal(
