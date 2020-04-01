@@ -134,21 +134,22 @@ impl Client {
         }
     }
 
-   // #[cfg(cargo_web)]
+    #[cfg(cargo_web)]
     pub fn handle_pointer_moved(&mut self,  x: i32, y: i32) -> bool {
-        let scale = self.render_context.window.scale_factor();
-        self.render_context.mouse_position.x = x as i32 * scale as i32; // / scale as i32;
-        self.render_context.mouse_position.y = y as i32 * scale as i32; // / scale as i32;
-        false
-    }
-/*
-    #[cfg(not(cargo_web))]
-    pub fn handle_pointer_moved(&mut self, x: i32, y: i32) -> bool {
         self.render_context.mouse_position.x = x as i32; // / scale as i32;
         self.render_context.mouse_position.y = y as i32; // / scale as i32;
         false
     }
-*/
+
+    #[cfg(not(cargo_web))]
+    pub fn handle_pointer_moved(&mut self, x: i32, y: i32) -> bool {
+        let scale = self.render_context.window.scale_factor();
+        self.render_context.mouse_position.x = x as i32 * scale as i32; // / scale as i32;
+        self.render_context.mouse_position.y = y as i32 * scale as i32; // / scale as i32;
+        println!("{:?}", self.render_context.mouse_position);
+        false
+    }
+
     pub fn handle_event(&mut self, event: Event) -> bool {
         match event {
             Event::KeyboardInput(event) => {

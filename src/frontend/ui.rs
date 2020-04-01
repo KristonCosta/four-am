@@ -7,7 +7,7 @@ use crate::color::{RED, BLACK};
 use legion::prelude::*;
 use crate::component::{Health, Player, Name};
 
-const VERSION: &str = "1.1.1";
+const VERSION: &str = "1.1.2";
 
 pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
     draw_box(
