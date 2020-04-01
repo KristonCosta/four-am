@@ -2,7 +2,6 @@ use crate::component::{Killed, Name, Position, TurnState, Hurt};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Vector};
 use crate::message::Message;
-use crate::resources::log::GameLog;
 use crate::{color, component};
 
 use crate::map::Map;
@@ -89,12 +88,12 @@ impl MessageQueue {
 impl Server {
     fn setup_ecs() -> (Universe, World, Resources) {
         let universe = Universe::new();
-        let mut world = universe.create_world();
+        let world = universe.create_world();
 
         let mut resources = Resources::default();
         let turn = PendingMoves::new();
 
-        let mut message_queue = MessageQueue { messages: vec![] };
+        let message_queue = MessageQueue { messages: vec![] };
         resources.insert(turn);
 
         resources.insert(message_queue);
@@ -103,23 +102,17 @@ impl Server {
     }
 
     pub async fn new() -> Self {
-        let (mut universe, mut world, mut resources) = Self::setup_ecs();
+        let (universe, world, mut resources) = Self::setup_ecs();
         let mut rng = rand::thread_rng();
         let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
         let BuiltMap {
-            spawn_list,
+            spawn_list: _,
             map,
-            starting_position,
-            rooms,
+            starting_position: _,
+            rooms: _,
             history,
             with_history,
         } = &built_map;
-
-
-        let position = match starting_position {
-            Some(pos) => pos,
-            None => panic!("No starting position in map!"),
-        };
 
         if *with_history {
             resources.insert(history[0].clone())
@@ -165,18 +158,13 @@ impl Server {
         std::mem::swap(&mut self.world, &mut world);
         self.run_state = RunState::MapGeneration;
         let BuiltMap {
-            spawn_list,
+            spawn_list: _,
             map,
-            starting_position,
-            rooms,
+            starting_position: _,
+            rooms: _,
             history,
             with_history,
         } = &built_map;
-
-        let position = match starting_position {
-            Some(pos) => pos,
-            None => panic!("No starting position in map!"),
-        };
 
         if *with_history {
             self.resources.insert(history[0].clone())
@@ -252,7 +240,7 @@ impl Server {
     }
 
     pub fn messages(&mut self) -> Vec<Message> {
-        let mut queue = self.resources.get_mut::<MessageQueue>();
+        let queue = self.resources.get_mut::<MessageQueue>();
         queue
             .expect("failed to get resource")
             .messages
@@ -306,8 +294,8 @@ impl Server {
         let world = &mut self.world;
         let resources = &mut self.resources;
         let mut message_queue = resources.get_mut::<MessageQueue>().unwrap();
-        let mut map = resources.get_mut::<Map>().unwrap();
-        let mut query = <(
+        let map = resources.get_mut::<Map>().unwrap();
+        let query = <(
             Write<component::Position>,
             Write<component::ActiveTurn>,
         )>::query().filter(tag::<component::Player>());
@@ -354,7 +342,7 @@ impl Server {
 }
 
 fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Point) {
-    let entity = buffer.start_entity()
+    buffer.start_entity()
         .with_component(component::Position {
             x: position.x,
             y: position.y,
@@ -380,7 +368,7 @@ fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Poi
         .build();
 }
 
-fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, data: &Data, i: u32) {
+fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, data: &Data, _: u32) {
     let mut rng = rand::thread_rng();
     let mut position_x;
     let mut position_y;

@@ -1,4 +1,4 @@
-use crate::component::{ActiveTurn, Killed, Monster, Name, Position, TurnState, Hurt};
+use crate::component::{ActiveTurn, Monster, Name, Position, TurnState, Hurt};
 use crate::map::Map;
 use crate::message::Message;
 use crate::server::server::MessageQueue;
@@ -21,7 +21,7 @@ pub fn ai_system() -> Box<dyn Schedulable> {
         .build(move |command_buffer, mut world, (queue, map), query| {
             let map: &mut Map = map;
             let mut killed = vec![];
-            for (entity, (_, name, mut turn, mut pos)) in query.iter_entities_mut(&mut world) {
+            for (entity, (_, _, mut turn, mut pos)) in query.iter_entities_mut(&mut world) {
                 let mut rng = rand::thread_rng();
                 let delta_x = rng.gen_range(-1, 2);
                 let delta_y = rng.gen_range(-1, 2);
@@ -43,7 +43,7 @@ pub fn ai_system() -> Box<dyn Schedulable> {
             }
             for (entity, other_entity) in killed {
                 let name = world.get_component::<Name>(entity).unwrap();
-                let other_name = world.get_component::<Name>(entity).unwrap();
+                let other_name = world.get_component::<Name>(other_entity).unwrap();
                 queue.push(Message::GameEvent(
                     format!("Ouch, {} hurt {}", name.name, other_name.name),
                     Some(Color::RED),

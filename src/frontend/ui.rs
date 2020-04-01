@@ -1,8 +1,8 @@
-use crate::frontend::client::{RenderContext, TileContext};
+use crate::frontend::client::{RenderContext};
 use crate::frontend::glyph::Glyph;
 
 use crate::geom::{Point, Rect};
-use quicksilver::graphics::{Color, Graphics};
+use quicksilver::graphics::{Color};
 use crate::color::{RED, BLACK};
 use legion::prelude::*;
 use crate::component::{Health, Player, Name};
@@ -32,11 +32,9 @@ pub fn draw_ui(render_context: &mut RenderContext, world: &World) {
         None,
         None,
     );
-    let mut query = <(
-        Read<Health>
-    )>::query().filter(tag::<Player>());
+    let query = <Read<Health>>::query().filter(tag::<Player>());
 
-    for (health) in query.iter(world) {
+    for health in query.iter(world) {
         let health_string = format!("Health: {}/{}", health.current, health.max);
         print(render_context, health_string.as_str(), (50, 1), None, None);
         draw_bar_horizontal(render_context, (64, 1).into(), 14, health.current as u32, health.max, RED, BLACK);

@@ -6,7 +6,7 @@ pub fn index_system() -> Box<dyn Schedulable> {
     SystemBuilder::new("map_indexer")
         .write_resource::<Map>()
         .with_query(<(Read<Position>, Read<TileBlocker>)>::query())
-        .build(move |_, mut world, (map), query_entity| {
+        .build(move |_, mut world, map, query_entity| {
             let map: &mut Map = map;
             map.refresh_blocked();
             map.refresh_content();

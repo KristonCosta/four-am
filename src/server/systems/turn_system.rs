@@ -1,5 +1,4 @@
 use crate::component::{ActiveTurn, Priority, TurnState};
-use crate::resources::log::GameLog;
 use legion::prelude::*;
 
 pub struct PendingMoves {
@@ -15,11 +14,11 @@ impl PendingMoves {
 pub fn turn_system() -> Box<dyn Schedulable> {
     SystemBuilder::new("turn_system")
         .write_resource::<PendingMoves>()
-        .with_query(<(Read<ActiveTurn>)>::query())
-        .with_query(<(Read<Priority>)>::query())
+        .with_query(<Read<ActiveTurn>>::query())
+        .with_query(<Read<Priority>>::query())
         .build(
-            move |command_buffer, mut world, (pending_moves), (turn_query, priority_query)| {
-                let mut active_entity = turn_query.iter_entities(world).next();
+            move |command_buffer, world, pending_moves, (turn_query, priority_query)| {
+                let active_entity = turn_query.iter_entities(world).next();
                 let still_active = match active_entity {
                     Some((entity, active_turn)) => {
                         if active_turn.state == TurnState::DONE {
@@ -36,7 +35,7 @@ pub fn turn_system() -> Box<dyn Schedulable> {
                     if pending_moves.list.is_empty() {
                         let mut priority_tuple = vec![];
 
-                        for (entity, (priority)) in priority_query.iter_entities_mut(world) {
+                        for (entity, priority) in priority_query.iter_entities_mut(world) {
                             priority_tuple.push((priority.value, entity));
                         }
                         priority_tuple.sort_by_key(|k| k.0);

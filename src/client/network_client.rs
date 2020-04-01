@@ -1,7 +1,6 @@
 use crate::geom::Vector;
 use crate::server::server::Server;
 use legion::prelude::*;
-use std::ops::Deref;
 
 pub struct NetworkClient {
     server: Option<Server>,

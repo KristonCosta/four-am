@@ -75,7 +75,7 @@ impl TimeStep {
     }
 }
 
-async fn app(window: Window, mut gfx: Graphics, mut events: EventStream) -> Result<()> {
+async fn app(window: Window, gfx: Graphics, events: EventStream) -> Result<()> {
     let mut timestep = TimeStep::new();
     let mut lag: f32 = 0.0;
     let mut turns = 0;

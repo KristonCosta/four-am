@@ -1,7 +1,6 @@
 use crate::geom::{Point, Rect, Vector};
 use crate::map::Map;
 use rand::prelude::ThreadRng;
-use rand::Rng;
 
 pub mod basic_builders;
 pub mod drunkard;

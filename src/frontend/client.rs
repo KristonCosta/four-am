@@ -2,14 +2,12 @@ use crate::frontend::camera::render_camera;
 use crate::frontend::glyph::Glyph;
 use crate::frontend::grid::Grid;
 use crate::frontend::tileset::Tileset;
-use crate::frontend::ui::{draw_box, print_glyphs, draw_ui};
+use crate::frontend::ui::{print_glyphs, draw_ui};
 use crate::frontend::{grid, tileset};
 use crate::geom::{Point, Rect, Vector};
-use legion::systems::resource::Fetch;
 
 use crate::client::network_client::{NetworkClient, WorldType};
 use crate::component;
-use crate::component::{Name, Position};
 use crate::message::Message;
 use crate::resources::log::GameLog;
 
@@ -17,7 +15,6 @@ use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 
 use legion::prelude::*;
-use quicksilver::lifecycle::event::{KeyboardEvent, PointerInputEvent, PointerMovedEvent};
 
 pub struct MapRegion {
     pub(crate) region: Rect,
@@ -26,14 +23,14 @@ pub struct MapRegion {
 
 impl MapRegion {
     pub fn project(&self, point: Point) -> Point {
-        let (min_x, max_x, min_y, max_y) = self.get_screen_bounds();
+        let (min_x, _, min_y, _) = self.get_screen_bounds();
         let x = point.x - min_x + self.region.origin.x;
         let y = point.y - min_y + self.region.origin.y;
         (x, y).into()
     }
 
     pub fn unproject(&self, point: Point) -> Point {
-        let (min_x, max_x, min_y, max_y) = self.get_screen_bounds();
+        let (min_x, _, min_y, _) = self.get_screen_bounds();
         let x = point.x + min_x - self.region.origin.x;
         let y = point.y + min_y - self.region.origin.y;
         (x, y).into()
@@ -84,7 +81,7 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(window: Window, mut gfx: Graphics, mut events: EventStream) -> Self {
+    pub async fn new(window: Window, gfx: Graphics, events: EventStream) -> Self {
         let x = 80;
         let y = 60;
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
@@ -114,10 +111,10 @@ impl Client {
     }
 
     pub fn sync(&mut self) {
-        let mut query = <(Read<component::Position>)>::query()
+        let query = <Read<component::Position>>::query()
             .filter(tag::<component::Player>());
         println!("Syncing");
-        for (position) in query.iter(self.network_client.world()) {
+        for position in query.iter(self.network_client.world()) {
             println!("Found player");
             self.render_context.map_region.focus = (position.x, position.y).into();
         }
@@ -133,7 +130,6 @@ impl Client {
         for message in messages {
             match message {
                 Message::GameEvent(msg, fg, bg) => self.log.push(msg.as_str(), fg, bg),
-                _ => unimplemented!(),
             }
         }
     }
@@ -212,7 +208,7 @@ impl Client {
 
     pub fn handle_click(&mut self, point: impl Into<Point>) {
         let point = self.map_region().unproject(point.into());
-        let mut query = <(Read<component::Name>, Read<component::Position>)>::query();
+        let query = <(Read<component::Name>, Read<component::Position>)>::query();
         let mut found = false;
         for (entity, (name, position)) in query.iter_entities(self.network_client.world()) {
             if position.x == point.x && position.y == point.y {
@@ -231,7 +227,7 @@ impl Client {
     }
 
     pub fn render(&mut self) {
-        let (x, y) = self.render_context.screen_size.to_tuple();
+        let (_, y) = self.render_context.screen_size.to_tuple();
         self.render_context.gfx.clear(Color::BLACK);
         draw_ui(&mut self.render_context, &self.network_client.world());
 

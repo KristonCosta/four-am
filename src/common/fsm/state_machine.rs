@@ -97,15 +97,8 @@ impl<E> StateMachine<E> {
 #[cfg(test)]
 mod tests {
     use crate::common::fsm::state::State;
-    use crate::common::fsm::state_machine::StateDef;
-    use crate::common::fsm::state_machine::StateMachine;
     use crate::common::fsm::state_machine::StateMachineBuilder;
     use crate::common::fsm::state_transition::StateTransition;
-    #[derive(PartialEq, Eq)]
-    enum TestMessageEnum {
-        State1,
-        State2,
-    }
 
     struct TestEntity {
         pub state1: i32,

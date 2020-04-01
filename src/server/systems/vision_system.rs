@@ -8,7 +8,7 @@ pub fn vision_system() -> Box<dyn Schedulable> {
     SystemBuilder::new("vision_system")
         .write_resource::<Map>()
         .with_query(<(Read<Position>, Write<FieldOfView>)>::query())
-        .build(move |_, mut world, (map), query| {
+        .build(move |_, mut world, map, query| {
             let map: &mut Map = map;
             for (entity, (position, mut fov)) in query.iter_entities_mut(&mut world) {
                 let position = Point::new(position.x, position.y);

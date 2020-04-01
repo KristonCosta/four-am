@@ -1,6 +1,5 @@
 use crate::frontend::glyph::Glyph;
 use crate::geom;
-use legion::prelude::World;
 use crate::geom::Point;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1,8 +1,5 @@
-use crate::component::{Position, TileBlocker};
-use crate::geom::{Point, Rect, Vector};
+use crate::geom::{Point, Vector};
 use legion::prelude::*;
-use rand::Rng;
-use std::cmp::{max, min};
 
 #[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TileType {

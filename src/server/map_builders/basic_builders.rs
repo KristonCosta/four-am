@@ -8,7 +8,7 @@ use std::cmp::{max, min};
 pub struct RoomMapBuilder;
 
 impl BaseMapBuilder for RoomMapBuilder {
-    fn build(&mut self, rng: &mut ThreadRng, build_data: &mut BuiltMap) {
+    fn build(&mut self, _: &mut ThreadRng, build_data: &mut BuiltMap) {
         let size: (i32, i32) = build_data.map.size.to_tuple();
         let map = &mut build_data.map;
         create_room(

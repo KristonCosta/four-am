@@ -1,12 +1,10 @@
 use crate::component;
-use crate::frontend::client::{Client, TileContext};
+use crate::frontend::client::{Client};
 use crate::frontend::glyph::Glyph;
-use crate::geom::{Point, Rect, Vector};
 
 use crate::map::{Map, TileType};
 use legion::prelude::*;
-use quicksilver::graphics::{Color, Graphics};
-use std::ops::Deref;
+use quicksilver::graphics::{Color};
 
 // from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
 pub fn render_camera(client: &mut Client) {
@@ -56,7 +54,7 @@ pub fn render_camera(client: &mut Client) {
         }
     }
 
-    let mut query = <(Read<component::Position>, Read<component::Renderable>)>::query();
+    let query = <(Read<component::Position>, Read<component::Renderable>)>::query();
     let world = client.network_client.world();
     let mut data = query.iter(world).collect::<Vec<_>>();
     data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
