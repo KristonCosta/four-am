@@ -138,6 +138,21 @@ impl Client {
         }
     }
 
+    #[cfg(cargo_web)]
+    pub fn handle_pointer_moved(&mut self,  x: i32, y: i32) -> bool {
+        let scale = self.render_context.window.scale_factor();
+        self.render_context.mouse_position.x = x as i32 * scale as i32; // / scale as i32;
+        self.render_context.mouse_position.y = y as i32 * scale as i32; // / scale as i32;
+        false
+    }
+
+    #[cfg(not(cargo_web))]
+    pub fn handle_pointer_moved(&mut self, x: i32, y: i32) -> bool {
+        self.render_context.mouse_position.x = x as i32; // / scale as i32;
+        self.render_context.mouse_position.y = y as i32; // / scale as i32;
+        false
+    }
+
     pub fn handle_event(&mut self, event: Event) -> bool {
         match event {
             Event::KeyboardInput(event) => {
@@ -145,11 +160,8 @@ impl Client {
                 true
             }
             Event::PointerMoved(event) => {
-                let scale = self.render_context.window.scale_factor();
                 let location = event.location();
-                self.render_context.mouse_position.x = location.x as i32; // / scale as i32;
-                self.render_context.mouse_position.y = location.y as i32; // / scale as i32;
-                false
+                self.handle_pointer_moved(location.x as i32, location.y as i32)
             }
             Event::PointerInput(event) => {
                 if event.is_down() {

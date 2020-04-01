@@ -381,8 +381,6 @@ fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Poi
 }
 
 fn generate_centipede(map: &Map, buffer: &mut CommandBuffer, data: &Data, i: u32) {
-
-
     let mut rng = rand::thread_rng();
     let mut position_x;
     let mut position_y;
