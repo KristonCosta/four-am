@@ -1,4 +1,4 @@
-use crate::component::{Killed, Name, Position, TurnState, Hurt};
+use crate::component::{Hurt, Killed, Name, Position, TurnState};
 use crate::frontend::glyph::Glyph;
 use crate::geom::{Point, Vector};
 use crate::message::Message;
@@ -11,15 +11,14 @@ use crate::server::map_builders::BuiltMap;
 use crate::server::systems::ai_system::ai_system;
 use crate::server::systems::index_system::index_system;
 use crate::server::systems::turn_system::{turn_system, PendingMoves};
+use crate::server::systems::vision_system::vision_system;
 use instant::Instant;
 use legion::prelude::*;
 use quicksilver::graphics::Color;
-use rand::Rng;
-use std::cmp::{max, min};
-use crate::server::systems::vision_system::vision_system;
 use quicksilver::load_file;
-use serde::{Deserialize};
-
+use rand::Rng;
+use serde::Deserialize;
+use std::cmp::{max, min};
 
 pub struct Server {
     pub(crate) world: World,
@@ -33,7 +32,7 @@ pub struct Server {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Data {
-    pub mobs: Vec<Monster>
+    pub mobs: Vec<Monster>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -41,12 +40,12 @@ pub struct Monster {
     pub name: String,
     pub renderable: Renderable,
     pub health: Health,
-    pub priority: Priority
+    pub priority: Priority,
 }
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Renderable {
-    pub glyph: GlyphData
+    pub glyph: GlyphData,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -67,7 +66,6 @@ pub struct Health {
 pub struct Priority {
     pub value: u32,
 }
-
 
 pub struct MapState {
     mapgen_index: usize,
@@ -295,10 +293,8 @@ impl Server {
         let resources = &mut self.resources;
         let mut message_queue = resources.get_mut::<MessageQueue>().unwrap();
         let map = resources.get_mut::<Map>().unwrap();
-        let query = <(
-            Write<component::Position>,
-            Write<component::ActiveTurn>,
-        )>::query().filter(tag::<component::Player>());
+        let query = <(Write<component::Position>, Write<component::ActiveTurn>)>::query()
+            .filter(tag::<component::Player>());
 
         let mut command_buffer = CommandBuffer::new(&world);
         let mut killed = vec![];
@@ -342,7 +338,8 @@ impl Server {
 }
 
 fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Point) {
-    buffer.start_entity()
+    buffer
+        .start_entity()
         .with_component(component::Position {
             x: position.x,
             y: position.y,
@@ -350,7 +347,12 @@ fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Poi
         .with_component(component::Renderable {
             glyph: Glyph {
                 ch: monster.renderable.glyph.ch,
-                foreground: monster.renderable.glyph.foreground.as_ref().map(|color| Color::from_hex(&color)) ,
+                foreground: monster
+                    .renderable
+                    .glyph
+                    .foreground
+                    .as_ref()
+                    .map(|color| Color::from_hex(&color)),
                 background: None,
                 render_order: monster.renderable.glyph.render_order as i32,
             },
@@ -362,7 +364,9 @@ fn generate_monster(buffer: &mut CommandBuffer, monster: &Monster, position: Poi
         .with_component(component::Name {
             name: monster.name.clone(),
         })
-        .with_component(component::Priority { value: monster.priority.value as u8 })
+        .with_component(component::Priority {
+            value: monster.priority.value as u8,
+        })
         .with_component(component::TileBlocker)
         .with_component(component::Monster)
         .build();

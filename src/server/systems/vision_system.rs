@@ -1,4 +1,4 @@
-use crate::component::{FieldOfView, Position, Player};
+use crate::component::{FieldOfView, Player, Position};
 use crate::geom::Point;
 use crate::map::Map;
 use crate::server::fov::calculate_fov;
@@ -13,7 +13,7 @@ pub fn vision_system() -> Box<dyn Schedulable> {
             for (entity, (position, mut fov)) in query.iter_entities_mut(&mut world) {
                 let position = Point::new(position.x, position.y);
                 if position == fov.previous_position {
-                    continue
+                    continue;
                 }
                 fov.visible_tiles.clear();
                 let mut visible_tiles = calculate_fov(position, fov.range, map);

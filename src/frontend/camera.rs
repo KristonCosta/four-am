@@ -1,77 +1,130 @@
 use crate::component;
-use crate::frontend::client::{Client};
+use crate::frontend::client::Client;
 use crate::frontend::glyph::Glyph;
 
-use crate::map::{Map, TileType};
+use super::screen::terminal::Terminal;
+use crate::{
+    client::network_client::NetworkClient,
+    geom::{Point, Rect, Vector},
+    map::{Map, TileType},
+};
 use legion::prelude::*;
-use quicksilver::graphics::{Color};
+use quicksilver::graphics::Color;
 
-// from https://bfnightly.bracketproductions.com/rustbook/chapter_41.html
-pub fn render_camera(client: &mut Client) {
-    let (min_x, max_x, min_y, max_y) = client.map_region().get_screen_bounds();
-    let (map_width, map_height) = client.resources().get::<Map>().unwrap().size.to_tuple();
+pub struct Camera {
+    dimensions: Vector,
+    focus: Point,
+}
 
-    for (y, ty) in (min_y..max_y).enumerate() {
-        for (x, tx) in (min_x..max_x).enumerate() {
-            let x = x as i32 + client.map_region().region.origin.x;
-            let y = y as i32 + client.map_region().region.origin.y;
-            if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
-                let map = client.network_client.resources().get::<Map>().unwrap();
-                let index = map.point_to_index((tx, ty).into());
-                if !map.revealed_tiles[index] {
-                    continue;
-                }
-                let tile = map
-                    .tiles
-                    .get((tx + ty * map_width) as usize)
-                    .expect(&format!("Couldn't find {} {}", tx, ty));
-
-                let glyph = match tile {
-                    TileType::Wall => {
-                        Glyph::from('#', Some(Color::GREEN), None)
-                    }
-                    TileType::Floor => {
-                        Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None)
-
-                    }
-                    TileType::Digging => {
-                        Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None)
-                    }
-                };
-                let glyph = if map.visible_tiles[index] {
-                    glyph
-                } else {
-                    glyph.greyscale()
-                };
-                client
-                    .render_context
-                    .draw(&glyph, (x, y))
-            } else {
-                client
-                    .render_context
-                    .draw(&Glyph::from('-', Some(Color::WHITE), None), (x, y));
-            }
+impl Camera {
+    pub fn new(dimensions: impl Into<Vector>, focus: impl Into<Point>) -> Self {
+        Camera {
+            dimensions: dimensions.into(),
+            focus: focus.into(),
         }
     }
 
-    let query = <(Read<component::Position>, Read<component::Renderable>)>::query();
-    let world = client.network_client.world();
-    let mut data = query.iter(world).collect::<Vec<_>>();
-    data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
-    let map = client.network_client.resources().get::<Map>().unwrap();
-    for (pos, render) in data.iter() {
-        let (x, y) = client.map_region().project((pos.x, pos.y).into()).to_tuple();
-        if x >= client.map_region().region.origin.x
-            && y >= client.map_region().region.origin.y
-            && x < (client.map_region().region.origin.x + client.map_region().region.size.width)
-            && y < (client.map_region().region.origin.y + client.map_region().region.size.height)
-        {
-            let index = map.point_to_index((pos.x, pos.y).into());
-            if map.visible_tiles[index] {
-                client.render_context.draw(&render.glyph, (x, y));
+    pub fn set_dimensions(&mut self, dimensions: Vector) {
+        self.dimensions = dimensions
+    }
+
+    pub fn focus(&self) -> Point {
+        self.focus
+    }
+
+    pub fn set_focus(&mut self, focus: impl Into<Point>) {
+        self.focus = focus.into();
+    }
+
+    pub fn move_focus(&mut self, delta: impl Into<Vector>) {
+        let delta = delta.into();
+        self.focus.x += delta.x;
+        self.focus.y += delta.y;
+    }
+
+    pub fn project(&self, point: Point) -> Point {
+        let (min_x, _, min_y, _) = self.get_screen_bounds();
+        let x = point.x - min_x;
+        let y = point.y - min_y;
+        (x, y).into()
+    }
+
+    pub fn unproject(&self, point: Point) -> Point {
+        let (min_x, _, min_y, _) = self.get_screen_bounds();
+        let x = point.x + min_x;
+        let y = point.y + min_y;
+        (x, y).into()
+    }
+
+    pub fn get_screen_bounds(&self) -> (i32, i32, i32, i32) {
+        let focus = self.focus;
+        let (x_chars, y_chars) = self.dimensions.to_tuple();
+
+        let center_x = x_chars / 2;
+        let center_y = y_chars / 2;
+
+        let min_x = focus.x - center_x;
+        let max_x = min_x + x_chars;
+
+        let min_y = focus.y - center_y;
+        let max_y = min_y + y_chars;
+        (min_x, max_x, min_y, max_y)
+    }
+
+    pub fn render(&self, client: &NetworkClient, terminal: &mut Terminal) {
+        let (min_x, max_x, min_y, max_y) = self.get_screen_bounds();
+        let (map_width, map_height) = client.resources().get::<Map>().unwrap().size.to_tuple();
+
+        for (y, ty) in (min_y..max_y).enumerate() {
+            for (x, tx) in (min_x..max_x).enumerate() {
+                let x = x as i32;
+                let y = y as i32;
+                if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
+                    let map = client.resources().get::<Map>().unwrap();
+                    let index = map.point_to_index((tx, ty).into());
+                    //  if !map.revealed_tiles[index] {
+                    //      continue;
+                    //  }
+                    let tile = map
+                        .tiles
+                        .get((tx + ty * map_width) as usize)
+                        .expect(&format!("Couldn't find {} {}", tx, ty));
+
+                    let glyph = match tile {
+                        TileType::Wall => Glyph::from('#', Some(Color::GREEN), None),
+                        TileType::Floor => {
+                            Glyph::from('.', Some(Color::from_rgba(128, 128, 128, 1.0)), None)
+                        }
+                        TileType::Digging => {
+                            Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None)
+                        }
+                    };
+                    let glyph = if map.visible_tiles[index] {
+                        glyph
+                    } else {
+                        glyph.greyscale()
+                    };
+                    terminal.draw((x, y), &glyph);
+                } else {
+                    let glyph = Glyph::from('-', Some(Color::WHITE), None);
+                    terminal.draw((x, y), &glyph);
+                }
+            }
+        }
+
+        let query = <(Read<component::Position>, Read<component::Renderable>)>::query();
+        let world = client.world();
+        let mut data = query.iter(world).collect::<Vec<_>>();
+        data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
+        let map = client.resources().get::<Map>().unwrap();
+        for (pos, render) in data.iter() {
+            let (x, y) = self.project((pos.x, pos.y).into()).to_tuple();
+            if x >= 0 && y >= 0 && x < (self.dimensions.x) && y < (self.dimensions.y) {
+                let index = map.point_to_index((pos.x, pos.y).into());
+                if map.visible_tiles[index] {
+                    terminal.draw((x, y), &render.glyph);
+                }
             }
         }
     }
 }
-
-

@@ -1,9 +1,9 @@
-use crate::frontend::camera::render_camera;
+use crate::frontend::camera::Camera;
 use crate::frontend::glyph::Glyph;
-use crate::frontend::grid::Grid;
+use crate::frontend::screen::grid::Grid;
+use crate::frontend::tileset;
 use crate::frontend::tileset::Tileset;
-use crate::frontend::ui::{print_glyphs, draw_ui};
-use crate::frontend::{grid, tileset};
+use crate::frontend::ui::{draw_ui, print_glyphs};
 use crate::geom::{Point, Rect, Vector};
 
 use crate::client::network_client::{NetworkClient, WorldType};
@@ -14,47 +14,10 @@ use crate::resources::log::GameLog;
 use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 
+use super::screen::terminal::Terminal;
 use legion::prelude::*;
 
-pub struct MapRegion {
-    pub(crate) region: Rect,
-    focus: Point,
-}
-
-impl MapRegion {
-    pub fn project(&self, point: Point) -> Point {
-        let (min_x, _, min_y, _) = self.get_screen_bounds();
-        let x = point.x - min_x + self.region.origin.x;
-        let y = point.y - min_y + self.region.origin.y;
-        (x, y).into()
-    }
-
-    pub fn unproject(&self, point: Point) -> Point {
-        let (min_x, _, min_y, _) = self.get_screen_bounds();
-        let x = point.x + min_x - self.region.origin.x;
-        let y = point.y + min_y - self.region.origin.y;
-        (x, y).into()
-    }
-
-    pub fn get_screen_bounds(&self) -> (i32, i32, i32, i32) {
-        let focus = self.focus;
-        let (x_chars, y_chars) = self.region.size.to_tuple();   //.grid.size.to_tuple();
-
-        let center_x = x_chars / 2;
-        let center_y = y_chars / 2;
-
-        let min_x = focus.x - center_x;
-        let max_x = min_x + x_chars;
-
-        let min_y = focus.y - center_y;
-        let max_y = min_y + y_chars;
-        (min_x, max_x, min_y, max_y)
-    }
-
-}
-
 pub struct RenderContext {
-    map_region: MapRegion,
     tile_ctx: TileContext,
     screen_size: Vector,
     mouse_position: Vector,
@@ -73,11 +36,33 @@ impl RenderContext {
     }
 }
 
+pub struct LayoutManager {
+    pub main: Terminal,
+    pub map: Terminal,
+    pub log: Terminal,
+    pub player: Terminal,
+    pub status: Terminal,
+    pub overlay: Terminal,
+}
+
+impl LayoutManager {
+    pub fn render(&mut self, context: &mut RenderContext) {
+        self.main.blit(&self.map);
+        self.main.blit(&self.log);
+        self.main.blit(&self.player);
+        self.main.blit(&self.status);
+        self.main.blit(&self.overlay);
+        self.main.render(context);
+    }
+}
+
 pub struct Client {
     log: GameLog,
     events: EventStream,
     pub(crate) render_context: RenderContext,
     pub network_client: NetworkClient,
+    layout: LayoutManager,
+    camera: Camera,
 }
 
 impl Client {
@@ -87,36 +72,49 @@ impl Client {
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
             .await
             .expect("oof");
-        let grid = grid::Grid::from_screen_size((x, y), (1200, 900));
+        let grid = Grid::from_screen_size((x, y), (1200, 900));
+        let dimensions = (x, y);
         let screen_size = Vector::new(x, y);
         let tile_ctx = TileContext { tileset, grid };
-        let map_region = Rect::new((1, 1).into(), (48, 44).into());
+
+        let main = Terminal::new(dimensions);
+        let map = main.subterminal((0, 0), (65, 50));
+        let log = main.subterminal((0, 49), (80, 11));
+        let player = main.subterminal((64, 0), (16, 10));
+        let status = main.subterminal((64, 9), (16, 50));
+        let mut overlay = main.subterminal(main.region.origin, main.region.size);
+        overlay.min_layer = 1;
+
+        let layout = LayoutManager {
+            main,
+            map,
+            log,
+            player,
+            status,
+            overlay,
+        };
+
         Client {
             events,
-            log: GameLog::with_length(5),
+            log: GameLog::with_length(30),
             render_context: RenderContext {
                 window,
-                map_region: MapRegion {
-                    region: map_region,
-                    focus: (x / 2, y / 2).into()
-                },
                 tile_ctx,
                 screen_size,
                 gfx,
                 targeted_entity: None,
-                mouse_position: (0, 0).into()
+                mouse_position: (0, 0).into(),
             },
+            camera: Camera::new((50, 46), (x / 2, y / 2)),
             network_client: NetworkClient::new(),
+            layout,
         }
     }
 
     pub fn sync(&mut self) {
-        let query = <Read<component::Position>>::query()
-            .filter(tag::<component::Player>());
-        println!("Syncing");
+        let query = <Read<component::Position>>::query().filter(tag::<component::Player>());
         for position in query.iter(self.network_client.world()) {
-            println!("Found player");
-            self.render_context.map_region.focus = (position.x, position.y).into();
+            self.camera.set_focus(*position);
         }
     }
 
@@ -135,18 +133,17 @@ impl Client {
     }
 
     #[cfg(cargo_web)]
-    pub fn handle_pointer_moved(&mut self,  x: i32, y: i32) -> bool {
-        self.render_context.mouse_position.x = x as i32; // / scale as i32;
-        self.render_context.mouse_position.y = y as i32; // / scale as i32;
+    pub fn handle_pointer_moved(&mut self, x: i32, y: i32) -> bool {
+        self.render_context.mouse_position.x = x as i32;
+        self.render_context.mouse_position.y = y as i32;
         false
     }
 
     #[cfg(not(cargo_web))]
     pub fn handle_pointer_moved(&mut self, x: i32, y: i32) -> bool {
         let scale = self.render_context.window.scale_factor();
-        self.render_context.mouse_position.x = x as i32 * scale as i32; // / scale as i32;
-        self.render_context.mouse_position.y = y as i32 * scale as i32; // / scale as i32;
-        println!("{:?}", self.render_context.mouse_position);
+        self.render_context.mouse_position.x = x as i32 * scale as i32;
+        self.render_context.mouse_position.y = y as i32 * scale as i32;
         false
     }
 
@@ -195,20 +192,20 @@ impl Client {
         }
     }
 
-
     pub fn handle_focus(&mut self, delta: impl Into<Vector>) {
-        self.render_context.map_region.focus += delta.into();
+        self.camera.move_focus(delta);
     }
 
     pub fn handle_move(&mut self, delta: impl Into<Vector>) {
         let delta = delta.into();
         if self.network_client.try_move_player(delta) {
-            self.render_context.map_region.focus += delta;
+            self.camera.move_focus(delta);
         }
     }
 
     pub fn handle_click(&mut self, point: impl Into<Point>) {
-        let point = self.map_region().unproject(point.into());
+        let point = self.camera.unproject(point.into());
+        println!("{:?}", point);
         let query = <(Read<component::Name>, Read<component::Position>)>::query();
         let mut found = false;
         for (entity, (name, position)) in query.iter_entities(self.network_client.world()) {
@@ -228,25 +225,22 @@ impl Client {
     }
 
     pub fn render(&mut self) {
-        let (_, y) = self.render_context.screen_size.to_tuple();
         self.render_context.gfx.clear(Color::BLACK);
-        draw_ui(&mut self.render_context, &self.network_client.world());
-
-        for (index, glyphs) in self.log.iter().enumerate() {
-            print_glyphs(
-                &mut self.render_context,
-                &glyphs,
-                (1, (y - 6 + index as i32) as i32),
-            );
-        }
-
-        render_camera(self);
-
+        self.camera.set_dimensions(self.layout.map.region.size.into());
+        self.camera
+            .render(&self.network_client, &mut self.layout.map);
+        draw_ui(
+            &mut self.layout,
+            &self.network_client.world(),
+            &mut self.render_context,
+            &mut self.log,
+        );
+        self.layout.render(&mut self.render_context);
         self.render_context.show();
     }
 
     pub fn focus(&self) -> Point {
-        self.render_context.map_region.focus
+        self.camera.focus()
     }
 
     pub fn mouse_position(&self) -> Vector {
@@ -255,10 +249,6 @@ impl Client {
 
     pub fn resources(&self) -> &Resources {
         self.network_client.resources()
-    }
-
-    pub fn map_region(&self) -> &MapRegion {
-        &self.render_context.map_region
     }
 
     pub fn tile_context(&self) -> &TileContext {

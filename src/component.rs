@@ -14,7 +14,6 @@ impl Into<Point> for Position {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Renderable {
     pub glyph: Glyph,
@@ -22,7 +21,6 @@ pub struct Renderable {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Player;
-
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Health {
@@ -42,7 +40,7 @@ pub struct PickableTile;
 pub struct FieldOfView {
     pub visible_tiles: Vec<geom::Point>,
     pub range: u32,
-    pub previous_position: Point
+    pub previous_position: Point,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

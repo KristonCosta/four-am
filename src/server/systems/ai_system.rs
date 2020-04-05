@@ -1,4 +1,4 @@
-use crate::component::{ActiveTurn, Monster, Name, Position, TurnState, Hurt};
+use crate::component::{ActiveTurn, Hurt, Monster, Name, Position, TurnState};
 use crate::map::Map;
 use crate::message::Message;
 use crate::server::server::MessageQueue;

@@ -1,5 +1,5 @@
-use quicksilver::graphics::Color;
 use crate::color::GREY;
+use quicksilver::graphics::Color;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Glyph {
@@ -24,7 +24,7 @@ impl Glyph {
             ch: self.ch,
             foreground: Some(GREY.with_alpha(0.5)),
             background: None,
-            render_order: self.render_order
+            render_order: self.render_order,
         }
     }
 }

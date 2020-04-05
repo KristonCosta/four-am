@@ -6,7 +6,7 @@ use rand::prelude::ThreadRng;
 
 pub fn random_builder(size: Vector, depth: i32, rng: &mut ThreadRng) -> BuiltMap {
     MapBuilder::new(size, depth, SimpleMapBuilder)
-    //    .keep_history()
+        //    .keep_history()
         .build(rng)
 }
 
@@ -20,6 +20,6 @@ pub fn drunk_builder(size: Vector, depth: i32, rng: &mut ThreadRng) -> BuiltMap 
             brush_size: 1,
         },
     )
-   // .keep_history()
+    // .keep_history()
     .build(rng)
 }
