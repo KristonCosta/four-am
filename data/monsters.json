@@ -11,7 +11,7 @@
       },
       "health": {
         "current": 3,
-        "max": 100
+        "max": 3
       },
       "priority": {
         "value": 1
@@ -28,7 +28,7 @@
       },
       "health": {
         "current": 3,
-        "max": 100
+        "max": 3
       },
       "priority": {
         "value": 1
