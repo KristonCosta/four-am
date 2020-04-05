@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1" name="viewport" />
+    
+</head>
+<body>
+    <script src="four-am.js"></script>
+    <script>
+
+        var canvas = document.getElementsByTagName( 'canvas' )[0];
+        function setupCanvas(canvas) {
+            // Get the device pixel ratio, falling back to 1.
+            var dpr = window.devicePixelRatio || 1;
+                    // Get the size of the canvas in CSS pixels.
+                    var rect = canvas.getBoundingClientRect();
+                    // Give the canvas pixel dimensions of their CSS
+                    // size * the device pixel ratio.
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    var ctx = canvas.getContext('2d');
+                    // Scale all drawing operations by the dpr, so you
+                    // don't have to worry about the difference.
+                    ctx.scale(dpr, dpr);
+                    // Set line width
+                    ctx.lineWidth = 10;
+
+                    // Wall
+                    ctx.strokeRect(75, 140, 150, 110);
+
+                    // Door
+                    ctx.fillRect(130, 190, 40, 60);
+
+                    // Roof
+                    ctx.beginPath();
+                    ctx.moveTo(50, 140);
+                    ctx.lineTo(150, 60);
+                    ctx.lineTo(250, 140);
+                    ctx.closePath();
+                    ctx.stroke();
+                    return ctx;
+        }
+        setupCanvas(canvas);
+    </script>
+</body>
+</html>
