@@ -5,7 +5,7 @@ pub struct Terminal {
     glyphs: Vec<Option<Glyph>>,
     pub(crate) region: Rect,
     contain_region: Rect,
-    num_layers: u8,
+    pub num_layers: u8,
     pub min_layer: u8,
 }
 
@@ -30,7 +30,6 @@ impl Terminal {
 
     pub fn draw(&mut self, position: impl Into<Vector>, glyph: &Glyph) {
         let position = position.into();
-    
         if self.contain_region.contains(position.to_tuple().into()) {
             let index = self.convert_to_index(position.x, position.y, self.min_layer);
             self.glyphs[index] = Some(glyph.clone());
@@ -52,24 +51,16 @@ impl Terminal {
         }
     }
 
-    pub fn blit(&mut self, terminal: &Terminal) {
+    pub fn blit(&mut self, terminal: &mut Terminal) {
         let intersection = self.region.intersection(&terminal.region).unwrap();
         let offset = intersection.origin - terminal.region.origin;
-        let x_width = intersection.size.width as usize;
-        for layer in terminal.min_layer..terminal.num_layers {
-            for (index, y) in (offset.y..offset.y + intersection.size.height).enumerate() {
-                let start = terminal.convert_to_index(offset.x, y, layer);
-                let end = start + x_width;
-                let new_glyphs = terminal.glyphs[start..end].iter().cloned();
-
-                let start = self.convert_to_index(
-                    intersection.origin.x,
-                    intersection.origin.y + index as i32,
-                    layer,
-                );
-                let end = start + x_width;
-
-                self.glyphs.splice(start..end, new_glyphs);
+        for layer in terminal.min_layer..terminal.min_layer + terminal.num_layers {
+            for (index_y, y) in (offset.y..offset.y + intersection.size.height).enumerate() {
+                for (index_x, x) in (offset.x..offset.x + intersection.size.width).enumerate() {
+                    let local_index = self.convert_to_index(intersection.origin.x + index_x as i32, intersection.origin.y + index_y as i32, layer);
+                    let other_index = terminal.convert_to_index(x, y, layer);
+                    self.glyphs[local_index] = terminal.glyphs[other_index].take();
+                }
             }
         }
     }

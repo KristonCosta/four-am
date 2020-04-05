@@ -13,7 +13,7 @@ impl Grid {
         Grid {
             width_multi: (screen.x / grid.x),
             height_multi: (screen.y / grid.y),
-            size: (grid.x, grid.y).into(),
+            size: grid,
         }
     }
 

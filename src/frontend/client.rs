@@ -3,8 +3,8 @@ use crate::frontend::glyph::Glyph;
 use crate::frontend::screen::grid::Grid;
 use crate::frontend::tileset;
 use crate::frontend::tileset::Tileset;
-use crate::frontend::ui::{draw_ui, print_glyphs};
-use crate::geom::{Point, Rect, Vector};
+use crate::frontend::ui::{draw_ui};
+use crate::geom::{Point, Vector};
 
 use crate::client::network_client::{NetworkClient, WorldType};
 use crate::component;
@@ -19,7 +19,6 @@ use legion::prelude::*;
 
 pub struct RenderContext {
     tile_ctx: TileContext,
-    screen_size: Vector,
     mouse_position: Vector,
     pub(crate) targeted_entity: Option<Entity>,
     gfx: Graphics,
@@ -47,11 +46,11 @@ pub struct LayoutManager {
 
 impl LayoutManager {
     pub fn render(&mut self, context: &mut RenderContext) {
-        self.main.blit(&self.map);
-        self.main.blit(&self.log);
-        self.main.blit(&self.player);
-        self.main.blit(&self.status);
-        self.main.blit(&self.overlay);
+        self.main.blit(&mut self.map);
+        self.main.blit(&mut self.log);
+        self.main.blit(&mut self.player);
+        self.main.blit(&mut self.status);
+        self.main.blit(&mut self.overlay);
         self.main.render(context);
     }
 }
@@ -67,24 +66,23 @@ pub struct Client {
 
 impl Client {
     pub async fn new(window: Window, gfx: Graphics, events: EventStream) -> Self {
-        let x = 80;
-        let y = 60;
+        let x = 110;
+        let y = 90;
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
             .await
             .expect("oof");
-        let grid = Grid::from_screen_size((x, y), (1200, 900));
+        let grid = Grid::from_screen_size((x, y), (1100, 900));
         let dimensions = (x, y);
-        let screen_size = Vector::new(x, y);
         let tile_ctx = TileContext { tileset, grid };
 
         let main = Terminal::new(dimensions);
-        let map = main.subterminal((0, 0), (65, 50));
-        let log = main.subterminal((0, 49), (80, 11));
-        let player = main.subterminal((64, 0), (16, 10));
-        let status = main.subterminal((64, 9), (16, 50));
+        let map = main.subterminal((0, 0), (91, 81));
+        let log = main.subterminal((0, 80), (110, 10));
+        let player = main.subterminal((90, 0), (20, 10));
+        let status = main.subterminal((90, 9), (20, 50));
         let mut overlay = main.subterminal(main.region.origin, main.region.size);
         overlay.min_layer = 1;
-
+        overlay.num_layers = 1;
         let layout = LayoutManager {
             main,
             map,
@@ -100,7 +98,6 @@ impl Client {
             render_context: RenderContext {
                 window,
                 tile_ctx,
-                screen_size,
                 gfx,
                 targeted_entity: None,
                 mouse_position: (0, 0).into(),

@@ -102,7 +102,7 @@ impl Server {
     pub async fn new() -> Self {
         let (universe, world, mut resources) = Self::setup_ecs();
         let mut rng = rand::thread_rng();
-        let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
+        let built_map = drunk_builder((400, 300).into(), 10, &mut rng);
         let BuiltMap {
             spawn_list: _,
             map,
@@ -181,13 +181,13 @@ impl Server {
 
     pub fn reload_drunken_world(&mut self) {
         let mut rng = rand::thread_rng();
-        let built_map = drunk_builder((80, 43).into(), 10, &mut rng);
+        let built_map = drunk_builder((400, 300).into(), 10, &mut rng);
         self.reload_world(built_map);
     }
 
     pub fn reload_room_world(&mut self) {
         let mut rng = rand::thread_rng();
-        let built_map = random_builder((80, 43).into(), 10, &mut rng);
+        let built_map = random_builder((400, 300).into(), 10, &mut rng);
         self.reload_world(built_map);
     }
 
@@ -304,7 +304,6 @@ impl Server {
             let desired_y = min(map.size.y, max(0, pos.y + delta_y));
 
             let coord = map.coord_to_index(desired_x, desired_y);
-            println!("{:?}{:?}", desired_x, desired_y);
             if map.blocked[coord] {
                 message_queue.push(Message::GameEvent(
                     format!("Ouch, you hit a wall!"),

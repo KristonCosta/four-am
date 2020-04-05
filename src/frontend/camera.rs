@@ -1,11 +1,10 @@
 use crate::component;
-use crate::frontend::client::Client;
 use crate::frontend::glyph::Glyph;
 
 use super::screen::terminal::Terminal;
 use crate::{
     client::network_client::NetworkClient,
-    geom::{Point, Rect, Vector},
+    geom::{Point, Vector},
     map::{Map, TileType},
 };
 use legion::prelude::*;
