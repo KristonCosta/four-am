@@ -5,6 +5,7 @@ use rand::prelude::ThreadRng;
 pub mod basic_builders;
 pub mod drunkard;
 pub mod factories;
+pub mod shop_builder;
 
 // Most of this taken from https://bfnightly.bracketproductions.com/rustbook/chapter_36.html
 pub trait BaseMapBuilder {

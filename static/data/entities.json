@@ -1,0 +1,29 @@
+{
+  "builder": [
+    {
+      "id": "player",
+      "name": "Player?",
+      "renderable": {
+        "glyph": {
+          "ch": "@",
+          "foreground": "#ffff00",
+          "render_order": 3
+        }
+      },
+      "priority": {
+        "value": 1
+      }
+    },
+    {
+      "id": "display",
+      "name": "Display Case",
+      "renderable": {
+        "glyph": {
+          "ch": "◙",
+          "foreground": "#ff7c7c",
+          "render_order": 3
+        }
+      }
+    }
+  ]
+}

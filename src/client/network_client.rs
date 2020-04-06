@@ -40,10 +40,7 @@ impl NetworkClient {
             .try_move_player(delta.x, delta.y)
     }
 
-    pub fn reload_world(&mut self, world_type: WorldType) {
-        match world_type {
-            WorldType::Drunken => self.server.as_mut().unwrap().reload_drunken_world(),
-            WorldType::Room => self.server.as_mut().unwrap().reload_room_world(),
-        }
+    pub fn try_interact(&mut self, entity: Entity) -> bool {
+        self.server.as_mut().unwrap().try_interact(entity)
     }
 }

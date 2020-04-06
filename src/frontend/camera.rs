@@ -80,10 +80,6 @@ impl Camera {
                 let y = y as i32;
                 if tx >= 0 && tx < map_width && ty >= 0 && ty < map_height {
                     let map = client.resources().get::<Map>().unwrap();
-                    let index = map.point_to_index((tx, ty).into());
-                    //  if !map.revealed_tiles[index] {
-                    //      continue;
-                    //  }
                     let tile = map
                         .tiles
                         .get((tx + ty * map_width) as usize)
@@ -98,11 +94,6 @@ impl Camera {
                             Glyph::from('>', Some(Color::from_rgba(128, 20, 20, 1.0)), None)
                         }
                     };
-                    let glyph = if map.visible_tiles[index] {
-                        glyph
-                    } else {
-                        glyph.greyscale()
-                    };
                     terminal.draw((x, y), &glyph);
                 } else {
                     let glyph = Glyph::from('-', Some(Color::WHITE), None);
@@ -115,14 +106,10 @@ impl Camera {
         let world = client.world();
         let mut data = query.iter(world).collect::<Vec<_>>();
         data.sort_by(|a, b| b.1.glyph.render_order.cmp(&a.1.glyph.render_order));
-        let map = client.resources().get::<Map>().unwrap();
         for (pos, render) in data.iter() {
             let (x, y) = self.project((pos.x, pos.y).into()).to_tuple();
             if x >= 0 && y >= 0 && x < (self.dimensions.x) && y < (self.dimensions.y) {
-                let index = map.point_to_index((pos.x, pos.y).into());
-                if map.visible_tiles[index] {
-                    terminal.draw((x, y), &render.glyph);
-                }
+                terminal.draw((x, y), &render.glyph);
             }
         }
     }

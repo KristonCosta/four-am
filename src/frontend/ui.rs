@@ -1,23 +1,22 @@
 use crate::frontend::client::RenderContext;
 use crate::frontend::glyph::Glyph;
 
-use super::{client::LayoutManager, screen::terminal::Terminal};
-use crate::color::{BLACK, RED};
+use super::{client::{UIMode, LayoutManager}, screen::terminal::Terminal};
 use crate::geom::{Point, Rect};
 use crate::{
-    component::{Health, Name, Player},
     resources::log::GameLog,
 };
 use legion::prelude::*;
 use quicksilver::graphics::Color;
 
-const VERSION: &str = "1.1.2";
+const VERSION: &str = "1.1.3";
 
 pub fn draw_ui(
     layout: &mut LayoutManager,
-    world: &World,
-    render_context: &RenderContext,
+    _: &World,
+    _: &RenderContext,
     game_log: &GameLog,
+    mode: &UIMode,
 ) {
     let LayoutManager {
         main,
@@ -32,52 +31,18 @@ pub fn draw_ui(
     draw_box(overlay, map.region, None, Some(Color::BLACK));
     draw_box(overlay, player.region, None, Some(Color::BLACK));
 
-    let query = <Read<Health>>::query().filter(tag::<Player>());
-
-    for health in query.iter(world) {
-        let health_string = format!("Health: {}/{}", health.current, health.max);
-        print(player, health_string.as_str(), (1, 1), None, None);
-        draw_bar_horizontal(
-            player,
-            (15, 1).into(),
-            14,
-            health.current as u32,
-            health.max,
-            RED,
-            BLACK,
-        );
-        break;
-    }
-
-    let mut name: Option<Name> = None;
-    let mut health: Option<Health> = None;
-    if let Some(targeted) = render_context.targeted_entity {
-        name = world.get_component::<Name>(targeted).map(|x| (*x).clone());
-        health = world.get_component::<Health>(targeted).map(|x| *x);
-    }
-
-    if let Some(name) = name {
-        print(status, name.name.as_str(), (1, 9), None, None);
-    }
-    if let Some(health) = health {
-        let health_string = format!("Health: {}/{}", health.current, health.max);
-        print(status, health_string.as_str(), (1, 10), None, None);
-        draw_bar_horizontal(
-            status,
-            (15, 10).into(),
-            14,
-            health.current as u32,
-            health.max,
-            RED,
-            BLACK,
-        );
-    }
-
     for (index, glyphs) in game_log.iter().rev().enumerate() {
         if index as i32 >= log.region.size.height - 1 {
             break;
         }
         print_glyphs(log, &glyphs, (1, log.region.size.height - index as i32 - 2));
+    }
+
+    match mode {
+        UIMode::Interact => {
+            print(status, "INTERACTIVE", (1, 1), Some(Color::RED), None);
+        }, 
+        _ => {}
     }
     print(log, VERSION, (1, 1), None, None);
 }

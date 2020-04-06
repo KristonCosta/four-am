@@ -1,6 +1,6 @@
 use crate::frontend::glyph::Glyph;
-use crate::geom;
 use crate::geom::Point;
+use legion::prelude::Entity;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Position {
@@ -22,25 +22,10 @@ pub struct Renderable {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Player;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Health {
-    pub current: u32,
-    pub max: u32,
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Name {
     pub name: String,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct PickableTile;
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct FieldOfView {
-    pub visible_tiles: Vec<geom::Point>,
-    pub range: u32,
-    pub previous_position: Point,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -56,18 +41,15 @@ pub struct ActiveTurn {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Monster;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TileBlocker;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Killed;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Hurt;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Priority {
     pub value: u8,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DisplayCabinet {
+    pub contents: Option<Entity>
+}
+

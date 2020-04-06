@@ -6,10 +6,10 @@ use crate::frontend::tileset::Tileset;
 use crate::frontend::ui::{draw_ui};
 use crate::geom::{Point, Vector};
 
-use crate::client::network_client::{NetworkClient, WorldType};
+use crate::client::network_client::NetworkClient;
 use crate::component;
 use crate::message::Message;
-use crate::resources::log::GameLog;
+use crate::{map::Map, resources::log::GameLog};
 
 use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{Event, EventStream, Key, Window};
@@ -55,6 +55,11 @@ impl LayoutManager {
     }
 }
 
+pub enum UIMode {
+    None,
+    Interact
+}
+
 pub struct Client {
     log: GameLog,
     events: EventStream,
@@ -62,6 +67,7 @@ pub struct Client {
     pub network_client: NetworkClient,
     layout: LayoutManager,
     camera: Camera,
+    mode: UIMode,
 }
 
 impl Client {
@@ -105,6 +111,7 @@ impl Client {
             camera: Camera::new((50, 46), (x / 2, y / 2)),
             network_client: NetworkClient::new(),
             layout,
+            mode: UIMode::None
         }
     }
 
@@ -171,22 +178,71 @@ impl Client {
 
     pub fn handle_key(&mut self, key: Key, is_down: bool) {
         if is_down {
-            match key {
-                Key::W => self.handle_move((0, -1)),
-                Key::A => self.handle_move((-1, 0)),
-                Key::S => self.handle_move((0, 1)),
-                Key::D => self.handle_move((1, 0)),
-                Key::Up => self.handle_focus((0, -1)),
-                Key::Left => self.handle_focus((-1, 0)),
-                Key::Down => self.handle_focus((0, 1)),
-                Key::Right => self.handle_focus((1, 0)),
-                Key::Q => self.network_client.reload_world(WorldType::Drunken),
-                Key::E => self.network_client.reload_world(WorldType::Room),
-                Key::C => self.sync(),
-                Key::Space => self.handle_move((0, 0)),
-                _ => {}
+            match self.mode {
+                UIMode::None => {
+                    match key {
+                        Key::W => self.handle_move((0, -1)),
+                        Key::A => self.handle_move((-1, 0)),
+                        Key::S => self.handle_move((0, 1)),
+                        Key::D => self.handle_move((1, 0)),
+                        Key::Up => self.handle_focus((0, -1)),
+                        Key::Left => self.handle_focus((-1, 0)),
+                        Key::Down => self.handle_focus((0, 1)),
+                        Key::Right => self.handle_focus((1, 0)),
+                        Key::C => self.sync(),
+                        Key::E => self.mode = UIMode::Interact,
+                        Key::Space => self.handle_move((0, 0)),
+                        Key::Escape => panic!("DIE DIE DIE"),
+                        _ => {}
+                    }
+                },
+                UIMode::Interact => {
+                    match key {
+                        Key::W => self.handle_interact((0, -1)),
+                        Key::A => self.handle_interact((-1, 0)),
+                        Key::S => self.handle_interact((0, 1)),
+                        Key::D => self.handle_interact((1, 0)),
+                        _ => {}
+                    }
+                }
             }
         }
+    }
+
+
+
+    pub fn handle_interact(&mut self, delta: impl Into<Vector>) {
+        self.mode = UIMode::None;
+        let delta = delta.into();
+        let query = <Read<component::Position>>::query().filter(tag::<component::Player>());
+        let player: Entity = query.iter_entities(&self.network_client.world()).take(1).next().expect("Couldn't find player").0;
+        let position = *self.network_client.world().get_component::<component::Position>(player).expect("Player didn't have a position.");
+        let map = self.network_client.resources().get::<Map>().unwrap();
+        let position: Vector = (position.x, position.y).into();
+        let index = map.point_to_index((position + delta.into()).to_tuple().into());
+        let mut found_entity = None;
+        if let Some(entity) = map.tile_content.get(index) {
+            if let Some(entity) = entity {
+                let name = self.network_client.world().get_component::<component::Name>(*entity).expect("This entity didn't have a name");
+                self.log.push(
+                    &format!("You interacted with {}", name.name),
+                    Some(Color::GREEN),
+                    None,
+                );
+                found_entity = Some(*entity);
+            }
+        }
+        std::mem::drop(map);
+        if let Some(entity) = found_entity {
+            self.network_client.try_interact(entity);
+        } else {
+            self.log.push(
+                &format!("You failed to interact with anything"),
+                Some(Color::RED),
+                None,
+            );
+        }
+
     }
 
     pub fn handle_focus(&mut self, delta: impl Into<Vector>) {
@@ -202,7 +258,6 @@ impl Client {
 
     pub fn handle_click(&mut self, point: impl Into<Point>) {
         let point = self.camera.unproject(point.into());
-        println!("{:?}", point);
         let query = <(Read<component::Name>, Read<component::Position>)>::query();
         let mut found = false;
         for (entity, (name, position)) in query.iter_entities(self.network_client.world()) {
@@ -231,6 +286,7 @@ impl Client {
             &self.network_client.world(),
             &mut self.render_context,
             &mut self.log,
+            &self.mode
         );
         self.layout.render(&mut self.render_context);
         self.render_context.show();

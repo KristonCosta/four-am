@@ -83,6 +83,7 @@ async fn app(window: Window, gfx: Graphics, events: EventStream) -> Result<()> {
     client.network_client.bind(server);
     client.sync();
     server = client.network_client.unbind();
+    let mut first = true;
     loop {
         // For now do this bind/unbind song and dance until fully refactored
         client.network_client.bind(server);
@@ -101,6 +102,10 @@ async fn app(window: Window, gfx: Graphics, events: EventStream) -> Result<()> {
         }
         let messages = server.messages();
         client.network_client.bind(server);
+        if first {
+            client.sync();
+            first = false;
+        }
         client.process_messages(messages);
         client.render();
         server = client.network_client.unbind();
