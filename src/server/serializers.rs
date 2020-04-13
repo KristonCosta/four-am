@@ -63,20 +63,15 @@ pub mod entity_factory {
 
         fn deserialize_color(color: Option<String>) -> Option<Color> {
             match color {
-                None => None, 
+                None => None,
                 Some(color) => Some(Color::from_hex(&color))
             }
         }
 
-        pub fn build(&self, id: &str, position: impl Into<Point>, buffer: &mut CommandBuffer) -> Entity {
-            let position = position.into();
+        pub fn build(&self, id: &str, position: Option<Point>, buffer: &mut CommandBuffer) -> Entity {
             let options = self.registry.get(id).expect(&format!("Could not find {:?}", id));
             let builder = buffer.start_entity();
             let builder = builder
-                .with_component(component::Position {
-                    x: position.x,
-                    y: position.y,
-                })
                 .with_component(component::Renderable {
                     glyph: Glyph {
                         ch: options.renderable.glyph.ch,
@@ -91,13 +86,21 @@ pub mod entity_factory {
                 .with_component(component::TileBlocker);
 
             let entity = builder.build();
+
+            if let Some(position) = position {
+                buffer.add_component(entity, component::Position {
+                    x: position.x,
+                    y: position.y,
+                });
+            }
             if let Some(priority) = options.priority.clone() {
                 buffer.add_component(entity, component::Priority{value: priority.value})
             }
 
             if let Some(display) = options.display_cabinet {
                 if display {
-                    buffer.add_component(entity, component::DisplayCabinet{contents: None})
+                    buffer.add_component(entity, component::Inventory{contents: None});
+                    buffer.add_tag(entity, component::DisplayCabinet);
                 }
             }
 

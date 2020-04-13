@@ -43,4 +43,12 @@ impl NetworkClient {
     pub fn try_interact(&mut self, entity: Entity) -> bool {
         self.server.as_mut().unwrap().try_interact(entity)
     }
+
+    pub fn try_take(&mut self, entity: Entity) -> bool {
+        self.server.as_mut().unwrap().try_take(entity)
+    }
+
+    pub fn try_put(&mut self, entity: Entity, id: &str) -> bool {
+        self.server.as_mut().unwrap().try_put(entity, id)
+    }
 }

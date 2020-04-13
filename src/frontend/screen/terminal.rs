@@ -1,5 +1,6 @@
 use crate::frontend::{client::RenderContext, glyph::Glyph};
 use crate::geom::{Point, Rect, Vector};
+use std::cmp::min;
 
 pub struct Terminal {
     glyphs: Vec<Option<Glyph>>,
@@ -12,7 +13,7 @@ pub struct Terminal {
 impl Terminal {
     pub fn new(dimensions: impl Into<Vector>) -> Self {
         let dimensions = dimensions.into();
-        let num_layers: u8 = 2;
+        let num_layers: u8 = 3;
         Terminal {
             glyphs: vec![None; ((dimensions.x) * (dimensions.y)) as usize * num_layers as usize],
             region: Rect::new((0, 0).into(), dimensions.into()),
@@ -32,6 +33,18 @@ impl Terminal {
         let position = position.into();
         if self.contain_region.contains(position.to_tuple().into()) {
             let index = self.convert_to_index(position.x, position.y, self.min_layer);
+            self.glyphs[index] = Some(glyph.clone());
+        }
+    }
+
+    pub fn draw_layer(&mut self, position: impl Into<Vector>, glyph: &Glyph, min_offset: u8) {
+        let position = position.into();
+        if min_offset > self.num_layers - 1 {
+            println!("Warning, tried drawing on an upper layer that doesn't exist.");
+        }
+        let layer = min(min_offset + self.min_layer, self.min_layer + self.num_layers - 1);
+        if self.contain_region.contains(position.to_tuple().into()) {
+            let index = self.convert_to_index(position.x, position.y, layer);
             self.glyphs[index] = Some(glyph.clone());
         }
     }
@@ -68,6 +81,8 @@ impl Terminal {
     pub fn subterminal(&self, origin: impl Into<Point>, dimensions: impl Into<Vector>) -> Terminal {
         let mut term = Terminal::new(dimensions);
         term.region.origin = origin.into();
+        term.min_layer = self.min_layer;
+        term.num_layers = self.num_layers;
         term
     }
 }

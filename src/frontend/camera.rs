@@ -112,5 +112,21 @@ impl Camera {
                 terminal.draw((x, y), &render.glyph);
             }
         }
+
+        let query = <(Read<component::Position>, Read<component::Inventory>)>::query().filter(tag::<component::DisplayCabinet>());
+
+        let world = client.world();
+        let data = query.iter(world).collect::<Vec<_>>();
+        for (pos, inv) in data.iter() {
+            let (x, y) = self.project((pos.x, pos.y).into()).to_tuple();
+            if x >= 0 && y >= 0 && x < (self.dimensions.x) && y < (self.dimensions.y) {
+                if let Some(obj) = inv.as_ref().contents {
+                    let renderable = world.get_component::<component::Renderable>(obj);
+                    if let Some(renderable) = renderable {
+                        terminal.draw_layer((x, y), &renderable.glyph, 1);
+                    }
+                }
+            }
+        }
     }
 }

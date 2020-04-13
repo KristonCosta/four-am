@@ -3,7 +3,7 @@ use crate::frontend::glyph::Glyph;
 use crate::frontend::screen::grid::Grid;
 use crate::frontend::tileset;
 use crate::frontend::tileset::Tileset;
-use crate::frontend::ui::{draw_ui};
+use crate::frontend::ui::{draw_ui, UIElement};
 use crate::geom::{Point, Vector};
 
 use crate::client::network_client::NetworkClient;
@@ -14,7 +14,7 @@ use crate::{map::Map, resources::log::GameLog};
 use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 
-use super::screen::terminal::Terminal;
+use super::{screen::terminal::Terminal, ui::DisplayCaseWidget};
 use legion::prelude::*;
 
 pub struct RenderContext {
@@ -54,10 +54,21 @@ impl LayoutManager {
         self.main.render(context);
     }
 }
+pub trait UIWidget : UIElement + Interactable {}
+pub enum UITransition {
+    None,
+    Switch(Box<dyn UIWidget>),
+    Exit
+}
+
+pub trait Interactable {
+    fn handle_key(&mut self, key: Key, client: &mut NetworkClient) -> UITransition;
+}
 
 pub enum UIMode {
     None,
-    Interact
+    Interact,
+    Overlay(Box<dyn UIWidget>)
 }
 
 pub struct Client {
@@ -72,8 +83,8 @@ pub struct Client {
 
 impl Client {
     pub async fn new(window: Window, gfx: Graphics, events: EventStream) -> Self {
-        let x = 110;
-        let y = 90;
+        let x = 60;
+        let y = 40;
         let tileset = tileset::Tileset::from_font(&gfx, "Px437_Wyse700b-2y.ttf", 16.0 / 8.0)
             .await
             .expect("oof");
@@ -82,12 +93,12 @@ impl Client {
         let tile_ctx = TileContext { tileset, grid };
 
         let main = Terminal::new(dimensions);
-        let map = main.subterminal((0, 0), (91, 81));
-        let log = main.subterminal((0, 80), (110, 10));
-        let player = main.subterminal((90, 0), (20, 10));
-        let status = main.subterminal((90, 9), (20, 50));
+        let map = main.subterminal((0, 0), (x - 19, y - 9));
+        let log = main.subterminal((0, y - 10), (x, 10));
+        let player = main.subterminal((x - 20, 0), (20, 10));
+        let status = main.subterminal((x - 20, 9), (20, 50));
         let mut overlay = main.subterminal(main.region.origin, main.region.size);
-        overlay.min_layer = 1;
+        overlay.min_layer = 2;
         overlay.num_layers = 1;
         let layout = LayoutManager {
             main,
@@ -178,7 +189,7 @@ impl Client {
 
     pub fn handle_key(&mut self, key: Key, is_down: bool) {
         if is_down {
-            match self.mode {
+            match &mut self.mode {
                 UIMode::None => {
                     match key {
                         Key::W => self.handle_move((0, -1)),
@@ -198,20 +209,34 @@ impl Client {
                 },
                 UIMode::Interact => {
                     match key {
-                        Key::W => self.handle_interact((0, -1)),
-                        Key::A => self.handle_interact((-1, 0)),
-                        Key::S => self.handle_interact((0, 1)),
-                        Key::D => self.handle_interact((1, 0)),
+                        Key::W => self.handle_interact((0, -1), false),
+                        Key::A => self.handle_interact((-1, 0),false),
+                        Key::S => self.handle_interact((0, 1), false),
+                        Key::D => self.handle_interact((1, 0), false),
                         _ => {}
                     }
+                }
+                UIMode::Overlay(overlay) => {
+                    let transition = overlay.handle_key(key, &mut self.network_client);
+                    self.handle_transition(transition)
                 }
             }
         }
     }
 
+    pub fn handle_transition(&mut self, transition: UITransition) {
+        match transition {
+            UITransition::None => {}
+            UITransition::Switch(inner) => {
+                self.mode = UIMode::Overlay(inner)
+            }
+            UITransition::Exit => {
+                self.mode = UIMode::None
+            }
+        }
+    }
 
-
-    pub fn handle_interact(&mut self, delta: impl Into<Vector>) {
+    pub fn handle_interact(&mut self, delta: impl Into<Vector>, take: bool) {
         self.mode = UIMode::None;
         let delta = delta.into();
         let query = <Read<component::Position>>::query().filter(tag::<component::Player>());
@@ -234,7 +259,18 @@ impl Client {
         }
         std::mem::drop(map);
         if let Some(entity) = found_entity {
-            self.network_client.try_interact(entity);
+            let inv = self.network_client.world().get_component::<component::Inventory>(entity);
+            let name = if let Some(inv) = inv {
+                if let Some(contents) = inv.contents {
+                    self.network_client.world().get_component::<component::Name>(contents).map(|name| name.name.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+            self.mode = UIMode::Overlay(Box::new(DisplayCaseWidget::new(entity, name)));
+            // self.network_client.try_interact(entity);
         } else {
             self.log.push(
                 &format!("You failed to interact with anything"),

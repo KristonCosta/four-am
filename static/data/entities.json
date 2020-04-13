@@ -15,6 +15,39 @@
       }
     },
     {
+      "id": "love",
+      "name": "Heart",
+      "renderable": {
+        "glyph": {
+          "ch": "♥",
+          "foreground": "#00dccb",
+          "render_order": 3
+        }
+      }
+    },
+    {
+      "id": "star",
+      "name": "Star",
+      "renderable": {
+        "glyph": {
+          "ch": "*",
+          "foreground": "#0053ff",
+          "render_order": 3
+        }
+      }
+    },
+    {
+      "id": "diamond",
+      "name": "Diamond",
+      "renderable": {
+        "glyph": {
+          "ch": "♦",
+          "foreground": "#6fa501",
+          "render_order": 3
+        }
+      }
+    },
+    {
       "id": "display",
       "name": "Display Case",
       "renderable": {
@@ -23,7 +56,8 @@
           "foreground": "#ff7c7c",
           "render_order": 3
         }
-      }
+      },
+      "display_cabinet": true
     }
   ]
 }

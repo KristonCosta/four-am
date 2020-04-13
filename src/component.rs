@@ -47,9 +47,11 @@ pub struct TileBlocker;
 pub struct Priority {
     pub value: u8,
 }
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DisplayCabinet;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DisplayCabinet {
+pub struct Inventory {
     pub contents: Option<Entity>
 }
 

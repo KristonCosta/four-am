@@ -104,12 +104,14 @@ impl Server {
             .starting_position
             .unwrap()
             .clone();
-        let player = self.factory.build("player", position, &mut command_buffer);
+        let player = self.factory.build("player", Some(position), &mut command_buffer);
         command_buffer.add_tag(player, component::Player);
-        self.factory.build("display", (position.x + 1, position.y), &mut command_buffer);
-        self.factory.build("display", (position.x + 1, position.y + 1), &mut command_buffer);
-        self.factory.build("display", (position.x + 1, position.y + 2), &mut command_buffer);
+        let entity = self.factory.build("display", Some((position.x + 1, position.y).into()), &mut command_buffer);
+        self.factory.build("display", Some((position.x + 1, position.y + 1).into()), &mut command_buffer);
+        self.factory.build("display", Some((position.x + 1, position.y + 2).into()), &mut command_buffer);
+        let love = self.factory.build("love", None, &mut command_buffer);
         command_buffer.write(&mut self.world);
+        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.replace(love);
     }
 
     pub fn messages(&mut self) -> Vec<Message> {
@@ -149,6 +151,35 @@ impl Server {
             renderable.glyph.foreground = Some(Color::GREEN);
         }
         true
+    }
+
+    pub fn try_put(&mut self, entity: Entity, id: &str) -> bool {
+        let mut command_buffer = CommandBuffer::new(&self.world);
+        let obj = self.factory.build(id, None, &mut command_buffer);
+        command_buffer.write(&mut self.world);
+        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.replace(obj);
+        true
+    }
+
+    pub fn try_take(&mut self, entity: Entity) -> bool {
+        let contents = {
+            let mut inv = self.world.get_component_mut::<component::Inventory>(entity).unwrap();
+            inv.as_mut().contents.take()
+        };
+        if let Some(contents) = contents {
+            let world = &mut self.world;
+            let resources = &mut self.resources;
+            let name = world.get_component_mut::<component::Name>(contents).unwrap();
+            let mut message_queue = resources.get_mut::<MessageQueue>().unwrap();
+            message_queue.push(Message::GameEvent(
+                format!("You took {:?}", name.name),
+                Some(Color::GREEN),
+                None,
+            ));
+            true
+        } else {
+            false
+        }
     }
 
     pub fn try_move_player(&mut self, delta_x: i32, delta_y: i32) -> bool {
