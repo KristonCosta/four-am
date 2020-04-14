@@ -1,3 +1,4 @@
+#![feature(vec_remove_item)]
 use crate::server::server::Server;
 use instant::Instant;
 use quicksilver::graphics::Graphics;

@@ -2,7 +2,7 @@
   "builder": [
     {
       "id": "player",
-      "name": "Player?",
+      "name": "Player",
       "renderable": {
         "glyph": {
           "ch": "@",
@@ -12,6 +12,10 @@
       },
       "priority": {
         "value": 1
+      },
+      "inventory": {
+        "contents": ["love", "star", "diamond", "club"],
+        "capacity": 3
       }
     },
     {
@@ -21,6 +25,17 @@
         "glyph": {
           "ch": "♥",
           "foreground": "#00dccb",
+          "render_order": 3
+        }
+      }
+    },
+    {
+      "id": "club",
+      "name": "Club",
+      "renderable": {
+        "glyph": {
+          "ch": "♣",
+          "foreground": "#9757ff",
           "render_order": 3
         }
       }

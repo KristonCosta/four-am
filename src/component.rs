@@ -50,8 +50,9 @@ pub struct Priority {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DisplayCabinet;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Inventory {
-    pub contents: Option<Entity>
+    pub contents: Vec<Entity>,
+    pub capacity: u8
 }
 

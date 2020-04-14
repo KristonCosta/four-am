@@ -14,7 +14,7 @@ use crate::{map::Map, resources::log::GameLog};
 use quicksilver::graphics::{Color, Graphics};
 use quicksilver::lifecycle::{Event, EventStream, Key, Window};
 
-use super::{screen::terminal::Terminal, ui::DisplayCaseWidget};
+use super::{screen::terminal::Terminal, ui::{InventoryEntry, DisplayCaseWidget}};
 use legion::prelude::*;
 
 pub struct RenderContext {
@@ -260,17 +260,22 @@ impl Client {
         std::mem::drop(map);
         if let Some(entity) = found_entity {
             let inv = self.network_client.world().get_component::<component::Inventory>(entity);
-            let name = if let Some(inv) = inv {
-                if let Some(contents) = inv.contents {
-                    self.network_client.world().get_component::<component::Name>(contents).map(|name| name.name.clone())
-                } else {
-                    None
-                }
+            if let Some(inv) = inv {
+                let contents = inv.contents.iter().map(|i|
+                    InventoryEntry::new(*i, self.network_client.world().get_component::<component::Name>(*i).unwrap().name.clone())
+                ).collect();
+                let player_inv = self.network_client.get_player_inventory();
+                let player_inv = player_inv.iter().map(|i|
+                    InventoryEntry::new(*i, self.network_client.world().get_component::<component::Name>(*i).unwrap().name.clone())
+                ).collect();
+                self.mode = UIMode::Overlay(Box::new(DisplayCaseWidget::new(entity, contents, player_inv)));
             } else {
-                None
-            };
-            self.mode = UIMode::Overlay(Box::new(DisplayCaseWidget::new(entity, name)));
-            // self.network_client.try_interact(entity);
+                self.log.push(
+                    &format!("Nothing to do with this thing"),
+                    Some(Color::RED),
+                    None,
+                );
+            }
         } else {
             self.log.push(
                 &format!("You failed to interact with anything"),

@@ -13,6 +13,12 @@ pub struct EntityBuilder {
     name: String,
     priority: Option<Priority>,
     display_cabinet: Option<bool>,
+    inventory: Option<Inventory>,
+}
+#[derive(Deserialize, Debug, Clone)]
+pub struct Inventory {
+    contents: Vec<String>,
+    capacity: u8,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -87,19 +93,36 @@ pub mod entity_factory {
 
             let entity = builder.build();
 
-            if let Some(position) = position {
+            if let Some(position) = &position {
                 buffer.add_component(entity, component::Position {
                     x: position.x,
                     y: position.y,
                 });
             }
-            if let Some(priority) = options.priority.clone() {
+            if let Some(priority) = &options.priority {
                 buffer.add_component(entity, component::Priority{value: priority.value})
+            }
+
+            let mut has_inventory = false;
+            if let Some(inventory) = &options.inventory {
+                has_inventory = true;
+                let mut contents = vec![];
+                for item in &inventory.contents {
+                    let item_config = self.registry.get(item).expect(&format!("Could not find {:?}", id));
+                    if let Some(_) = &item_config.inventory {
+                        panic!("Tried to store an inventory entitiy in another inventory. Base: {:?} Item: {:?}");
+                    }
+                    contents.push(self.build(item, None, buffer));
+                }
+                
+                buffer.add_component(entity, component::Inventory{contents: contents, capacity: inventory.capacity})
             }
 
             if let Some(display) = options.display_cabinet {
                 if display {
-                    buffer.add_component(entity, component::Inventory{contents: None});
+                    if !has_inventory {
+                        buffer.add_component(entity, component::Inventory{contents: vec![], capacity: 1});
+                    }
                     buffer.add_tag(entity, component::DisplayCabinet);
                 }
             }

@@ -120,8 +120,9 @@ impl Camera {
         for (pos, inv) in data.iter() {
             let (x, y) = self.project((pos.x, pos.y).into()).to_tuple();
             if x >= 0 && y >= 0 && x < (self.dimensions.x) && y < (self.dimensions.y) {
-                if let Some(obj) = inv.as_ref().contents {
-                    let renderable = world.get_component::<component::Renderable>(obj);
+                let contents: &Vec<Entity> = &inv.as_ref().contents;
+                if !contents.is_empty()  {
+                    let renderable = world.get_component::<component::Renderable>(*contents.first().unwrap());
                     if let Some(renderable) = renderable {
                         terminal.draw_layer((x, y), &renderable.glyph, 1);
                     }

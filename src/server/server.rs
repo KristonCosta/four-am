@@ -111,7 +111,7 @@ impl Server {
         self.factory.build("display", Some((position.x + 1, position.y + 2).into()), &mut command_buffer);
         let love = self.factory.build("love", None, &mut command_buffer);
         command_buffer.write(&mut self.world);
-        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.replace(love);
+        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.push(love);
     }
 
     pub fn messages(&mut self) -> Vec<Message> {
@@ -143,6 +143,16 @@ impl Server {
         }
     }
 
+    pub fn get_player(&self) -> Entity {
+        let query = <(Read<component::Position>)>::query().filter(tag::<component::Player>());
+        query.iter_entities(&self.world).next().unwrap().0
+    }
+
+    pub fn get_player_inventory(&self) -> Vec<Entity> {
+        let query = <(Read<component::Inventory>)>::query().filter(tag::<component::Player>());
+        query.iter(&self.world).next().unwrap().as_ref().contents.clone()
+    }
+
     pub fn try_interact(&mut self, entity: Entity) -> bool {
         let mut renderable = self.world.get_component_mut::<component::Renderable>(entity).unwrap();
         if renderable.glyph.foreground != Some(Color::RED) {
@@ -153,20 +163,21 @@ impl Server {
         true
     }
 
-    pub fn try_put(&mut self, entity: Entity, id: &str) -> bool {
-        let mut command_buffer = CommandBuffer::new(&self.world);
-        let obj = self.factory.build(id, None, &mut command_buffer);
-        command_buffer.write(&mut self.world);
-        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.replace(obj);
+    pub fn try_player_put(&mut self, entity: Entity, player_inv: Entity) -> bool {
+        let player_entity = self.get_player();
+        let player_inventory = self.world.get_component_mut::<component::Inventory>(player_entity).unwrap().contents.remove_item(&player_inv);
+        self.world.get_component_mut::<component::Inventory>(entity).unwrap().contents.push(player_inv);
         true
     }
 
-    pub fn try_take(&mut self, entity: Entity) -> bool {
+    pub fn try_player_take(&mut self, entity: Entity) -> bool {
         let contents = {
             let mut inv = self.world.get_component_mut::<component::Inventory>(entity).unwrap();
-            inv.as_mut().contents.take()
+            inv.as_mut().contents.pop()
         };
         if let Some(contents) = contents {
+            let player_entity = self.get_player();
+            let player_inventory = self.world.get_component_mut::<component::Inventory>(player_entity).unwrap().contents.push(contents.clone());
             let world = &mut self.world;
             let resources = &mut self.resources;
             let name = world.get_component_mut::<component::Name>(contents).unwrap();

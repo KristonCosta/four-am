@@ -9,9 +9,41 @@ use crate::{
 use legion::prelude::*;
 use quicksilver::{lifecycle::Key, graphics::Color};
 use super::client::{UIWidget, UITransition};
+use std::char::from_digit;
 
 const VERSION: &str = "1.1.3";
 
+pub fn key_to_char(key: Key) -> char {
+    match key {
+        Key::A => 'a',
+        Key::B => 'b',
+        Key::C => 'c',
+        Key::D => 'd',
+        Key::E => 'e',
+        Key::F => 'f',
+        Key::G => 'g',
+        Key::H => 'h',
+        Key::I => 'i',
+        Key::J => 'j',
+        Key::K => 'k',
+        Key::L => 'l',
+        Key::M => 'm',
+        Key::N => 'n',
+        Key::O => 'o',
+        Key::P => 'p',
+        Key::Q => 'q',
+        Key::R => 'r',
+        Key::S => 's',
+        Key::T => 't',
+        Key::U => 'u',
+        Key::V => 'v',
+        Key::W => 'w',
+        Key::X => 'x',
+        Key::Y => 'y',
+        Key::Z => 'z',
+        _ => '_'
+    }
+}
 
 pub trait UIElement {
     fn render(&self, terminal: &mut Terminal);
@@ -37,20 +69,53 @@ impl UIElement for MessageWidget {
         print(terminal, self.message.as_str(), (1, 1), None, Some(Color::BLACK))
      }
 }
-
-pub struct DisplayCaseWidget {
-    case: Entity,
-    contents: Option<String>,
+#[derive(Clone)]
+pub struct InventoryEntry {
+    entity: Entity,
+    display_name: String,
 }
 
-impl DisplayCaseWidget {
-    pub fn new(case: Entity, contents: Option<String>) -> Self {
-        DisplayCaseWidget {
-            case,
-            contents
+impl InventoryEntry {
+    pub fn new(entity: Entity, display_name: String) -> Self {
+        InventoryEntry {
+            display_name,
+            entity
         }
     }
 }
+pub struct InventoryWidget {
+    contents: Vec<InventoryEntry>
+}
+
+pub struct DisplayCaseWidget {
+    case: Entity,
+    contents: Vec<InventoryEntry>,
+    player_inventory: Vec<InventoryEntry>,
+}
+
+impl DisplayCaseWidget {
+    pub fn new(case: Entity, contents: Vec<InventoryEntry>, player_inventory: Vec<InventoryEntry>) -> Self {
+        DisplayCaseWidget {
+            case,
+            contents,
+            player_inventory
+        }
+    }
+}
+
+pub fn entity_enum(entites: &Vec<InventoryEntry>) -> Vec<(char, InventoryEntry)> {
+    let mut res = vec![];
+    for (index, entity) in entites.clone().drain(..).enumerate() {
+        res.push(((b'a' + index as u8) as char, entity));
+    }
+    res
+}
+
+pub fn get_entity(entities: &Vec<InventoryEntry>, c: char) -> Option<InventoryEntry> {
+    let index = ((c as u8) - b'a') as usize;
+    entities.get(index).map(|e| e.clone())
+}
+
 
 impl UIWidget for DisplayCaseWidget {}
 
@@ -58,46 +123,25 @@ impl Interactable for DisplayCaseWidget {
     fn handle_key(&mut self, key: quicksilver::lifecycle::Key, client: &mut NetworkClient) -> UITransition {
         match key {
             Key::T => {
-                if let Some(contents) = &self.contents {
-                    client.try_take(self.case);
+                if !self.contents.is_empty() {
+                    client.try_player_take(self.case);
                     UITransition::Switch(Box::new(MessageWidget{
-                    message: format!("You took the {:?}", contents)
+                    message: format!("You took the {:?}",  self.contents.first().unwrap().display_name)
                 }))
                 } else {
                     UITransition::Exit
                 }
             }
-            Key::H => {
-                if None == self.contents {
-                    client.try_put(self.case, "love");
-                    UITransition::Switch(Box::new(MessageWidget{
-                    message: format!("You put the {:?}", "heart")
-                }))
-                } else {
-                    UITransition::Exit
+            key => {
+                if self.contents.is_empty() {
+                    let key = key_to_char(key);
+                    if let Some(choice) = get_entity(&self.player_inventory, key) {
+                        client.try_player_put(self.case, choice.entity);
+                        return UITransition::Switch(Box::new(MessageWidget{
+                            message: format!("You put the {:?}",choice.display_name)
+                        }))
+                    }
                 }
-            }
-            Key::D => {
-                if None == self.contents {
-                    client.try_put(self.case, "diamond");
-                    UITransition::Switch(Box::new(MessageWidget{
-                    message: format!("You put the {:?}", "diamond")
-                }))
-                } else {
-                    UITransition::Exit
-                }
-            }
-            Key::S => {
-                if None == self.contents {
-                    client.try_put(self.case, "star");
-                    UITransition::Switch(Box::new(MessageWidget{
-                    message: format!("You put the {:?}", "star")
-                }))
-                } else {
-                    UITransition::Exit
-                }
-            }
-            _ => {
                 UITransition::Exit
             }
         }
@@ -109,14 +153,15 @@ impl UIElement for DisplayCaseWidget {
         let mut region = terminal.region.clone();
         region.origin = (0, 0).into();
         draw_box_filled(terminal, region, None, Some(Color::BLACK));
-        if let Some(contents) = &self.contents {
+        if !self.contents.is_empty() {
             print(terminal, &format!("Press T to take the"), (1, 1), None, Some(Color::BLACK));
-            print(terminal, &format!("'{:?}'", contents), (1, 2), None, Some(Color::BLACK))
+            print(terminal, &format!("'{:?}'", self.contents.first().unwrap().display_name), (1, 2), None, Some(Color::BLACK))
         } else {
-            print(terminal, &format!("To put press"), (1, 1), None, Some(Color::BLACK));
-            print(terminal, &format!("[H] Heart"), (1, 2), None, Some(Color::BLACK));
-            print(terminal, &format!("[D] Diamond"), (1, 3), None, Some(Color::BLACK));
-            print(terminal, &format!("[S] Star"), (1, 4), None, Some(Color::BLACK));
+
+            print(terminal, &format!("To put press:"), (1, 1), None, Some(Color::BLACK));
+            for (index, (c, entry)) in entity_enum(&self.player_inventory).iter().enumerate() {
+                print(terminal, &format!("[{}] {}", c, entry.display_name), (1, (2 + index) as i32), None, Some(Color::BLACK));
+            }
         }
 
      }
